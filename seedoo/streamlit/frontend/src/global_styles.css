@@ -1,0 +1,97 @@
+
+.checkmark {
+  font-size: 50px;
+  color: white;
+}
+
+.button_search{
+    position:absolute;
+    width:33px;
+    height:33px;
+    z-index:100000;
+    left: 8px;
+    top: 25px;
+    border-radius: 0.4rem;
+    outline: none;
+    color: inherit;
+    user-select: none;
+    cursor: pointer;
+    background-color: rgb(19, 23, 32);
+    border: 1px solid rgba(250, 250, 250, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+}
+.button_search:hover{
+    border: 1px solid rgb(255, 75, 75);
+}
+.button_search:hover svg{
+    stroke: rgb(255, 75, 75);
+}
+.loader {
+  border: 5px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top: 5px solid #000000;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+}
+.spinner_custom{
+    border: 4px solid rgba(255, 255, 255, 0.9);
+    border-radius: 50%;
+    border-top: 4px solid #29e0e6;
+    width: 20px;
+    height: 20px;
+    animation: spin 1s linear infinite;
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10001;
+}
+.spinner {
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top: 2px solid #000000;
+    width: 12px;
+    height: 12px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.hoverable-cell {
+    cursor: pointer;
+}
+
+.hover-table {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    z-index: 100000; /* Adjust as needed */
+    max-height: 600px;
+}
+
+.hoverable-cell:hover + .hover-table {
+    display: block;
+}
+
+.dashed-rectangle {
+    border: 2px dashed #007BFF;  /* Blue dashed border */
+    position: absolute;  /* Absolute positioning to overlay on the image */
+    pointer-events: none;  /* Ensures the rectangle doesn't interfere with mouse events */
+}
+
+.button_animate:active {
+  transform: scale(1.1);
+  background-color: #ddd;
+}
+
+

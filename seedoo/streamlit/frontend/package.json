@@ -1,0 +1,65 @@
+{
+  "name": "seedoo_ux",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@msgpack/msgpack": "^3.0.0-beta2",
+    "@types/rbush": "^3.0.3",
+    "fabric": "^5.3.0",
+    "file-loader": "^6.2.0",
+    "mathjs": "^12.4.1",
+    "rbush": "^3.0.1",
+    "react": "^16.13.1",
+    "react-dom": "^16.13.1",
+    "react-modal": "^3.16.1"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "webpack --config webpack.config.js",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": "react-app"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "homepage": ".",
+  "devDependencies": {
+    "@babel/core": "^7.22.10",
+    "@babel/preset-react": "^7.22.5",
+    "@types/fabric": "^5.3.3",
+    "@types/hoist-non-react-statics": "^3.3.1",
+    "@types/lodash": "^4.14.200",
+    "@types/node": "^12.0.0",
+    "@types/react": "^16.9.0",
+    "@types/react-dom": "^16.9.0",
+    "@types/react-modal": "^3.16.0",
+    "antd": "^5.10.2",
+    "babel-loader": "^9.1.3",
+    "compression-webpack-plugin": "^10.0.0",
+    "copy-webpack-plugin": "^11.0.0",
+    "css-loader": "^6.8.1",
+    "html-webpack-plugin": "^5.5.3",
+    "lodash": "^4.17.21",
+    "react-scripts": "4.0.3",
+    "react-shape-editor": "4.1.1",
+    "streamlit-component-lib": "^2.0.0",
+    "style-loader": "^3.3.3",
+    "styled-components": "^6.1.0",
+    "terser-webpack-plugin": "^5.3.9",
+    "ts-loader": "^9.4.4",
+    "typescript": "^4.2.0",
+    "webpack-cli": "^5.1.4"
+  }
+}

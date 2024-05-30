@@ -193,3 +193,4 @@ yarn-error.log*
 # Webpack & Babel
 dist/
 .cache/
+.idea/
