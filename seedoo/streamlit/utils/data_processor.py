@@ -32,11 +32,10 @@ def load_functions_with_decorator() -> Dict[type, Dict[str, Union[Callable, Opti
     """
     file_path = None
     try:
-      file_path = os.path.dirname(importlib.import_module(package_root).__file__)
+        file_path = os.path.dirname(importlib.import_module(package_root).__file__)
     except ModuleNotFoundError:
         raise ValueError(f"The package '{package_root}' is invalid.")
     functions = {}
-
 
     if file_path:
         for root, _, files in os.walk(file_path):
@@ -50,8 +49,10 @@ def load_functions_with_decorator() -> Dict[type, Dict[str, Union[Callable, Opti
         return functions
 
 
-def pick_page(current_page=None,key=''):
+def pick_page(current_page=None, key=''):
     st.session_state[key] = current_page
+
+
 def default_filter_callback(query: str, page_size: int, current_page: int, df: pd.DataFrame) -> pd.DataFrame:
     start_idx = current_page * page_size
     end_idx = start_idx + page_size
@@ -61,8 +62,20 @@ def default_filter_callback(query: str, page_size: int, current_page: int, df: p
     else:
         return df.iloc[start_idx:end_idx]
 
+
+def default_filter_callback(query: str, page_size: int, current_page: int, df) -> pd.DataFrame:
+    start_idx = current_page * page_size
+    end_idx = start_idx + page_size
+    if query:
+        filtered_df = df.query(query)
+        return filtered_df.iloc[start_idx:end_idx]
+    else:
+        return df.iloc[start_idx:end_idx]
+
+
 def process_dataframe(df: pd.DataFrame, columns_length: Optional[list] = None,
-                      filter: bool = None, filter_callback: Optional[Callable[[str, int, int], pd.DataFrame]] = None,
+                      filter: bool = None,
+                      filter_callback: Optional[Callable[[str, int, int], pd.DataFrame]] = default_filter_callback,
                       key: str = "process_dataframe_key", page_size_num: int = 5) -> None:
     """
     Processes each value in the DataFrame, passing it to a function based on the column's data type.
@@ -86,22 +99,10 @@ def process_dataframe(df: pd.DataFrame, columns_length: Optional[list] = None,
         PAGE_SIZE = st.session_state[key_page_size]
     current_page = st.session_state.get(key_current_page, 0)
 
-    def default_filter_callback(query: str, page_size: int, current_page: int) -> pd.DataFrame:
-        start_idx = current_page * page_size
-        end_idx = start_idx + page_size
-        if query:
-            filtered_df = df.query(query)
-            return filtered_df.iloc[start_idx:end_idx]
-        else:
-            return df.iloc[start_idx:end_idx]
-
     if filter:
-        query = st.text_input("Enter your query (e.g., id == 54):", key=key+'query')
+        query = st.text_input("Enter your query (e.g., id == 54):", key=key + 'query')
         try:
-            if filter_callback:
-                df = filter_callback(query, PAGE_SIZE, current_page)
-            else:
-                df = default_filter_callback(query, PAGE_SIZE, current_page)
+            df = filter_callback(query, PAGE_SIZE, current_page, df)
         except Exception as e:
             st.error(f"Query failed: {e}")
             return
