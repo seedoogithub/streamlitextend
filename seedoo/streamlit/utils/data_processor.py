@@ -9,20 +9,28 @@ import streamlit as st
 import pandas
 import functools
 
-custom_functions = {}
+# Dictionary to store custom functions
+custom_functions: Dict[type, Dict[str, Union[Callable, Optional[Callable]]]] = {}
 
 
-def register_function(name: type, func: Callable, component: Optional[Callable] = None) -> None:
-    custom_functions[name] = {'function': func, 'component': component}
-
-
-def load_functions_with_decorator() -> Dict[type, Dict[str, Union[Callable, Optional[Callable]]]]:
-    package_root = "seedoo.streamlit.module.default_module"
+def register_function(column_name: type, func: Callable, component: Optional[Callable] = None) -> None:
+    global custom_functions
     """
-    Scans all modules in the specified package for functions with the @type_matcher decorator.
+    Registers a function and an optional component for a specific data type.
 
     Args:
-        package_root (str): The root package to scan for modules and functions.
+        name (type): The data type to register the function for.
+        func (Callable): The function to handle the data type.
+        component (Optional[Callable]): An optional Streamlit component to display the processed data.
+    """
+
+    custom_functions[column_name] = {'function': func, 'component': component}
+
+
+def load_functions_with_decorator(package_root="seedoo.streamlit.module.default_module") -> Dict[type, Dict[str, Union[Callable, Optional[Callable]]]]:
+    global custom_functions
+    """
+    Scans all modules in the specified package for functions with the @type_matcher decorator.
 
     Returns:
         Dict[type, Dict[str, Union[Callable, Optional[Callable]]]]: A dictionary mapping column data types to corresponding functions and Streamlit components.
@@ -30,12 +38,14 @@ def load_functions_with_decorator() -> Dict[type, Dict[str, Union[Callable, Opti
     Raises:
         ValueError: If the specified root package is invalid.
     """
+
     file_path = None
     try:
         file_path = os.path.dirname(importlib.import_module(package_root).__file__)
     except ModuleNotFoundError:
         raise ValueError(f"The package '{package_root}' is invalid.")
-    functions = {}
+
+
 
     if file_path:
         for root, _, files in os.walk(file_path):
@@ -45,15 +55,34 @@ def load_functions_with_decorator() -> Dict[type, Dict[str, Union[Callable, Opti
                     for name, func in inspect.getmembers(module, inspect.isfunction):
                         if hasattr(func, '_column_type') or hasattr(func, '_column_name'):
                             key = func._column_type if hasattr(func, '_column_type') else func._column_name
-                            functions[key] = {'function': func, 'component': func._component}
-        return functions
+                            custom_functions[key] = {'function': func, 'component': func._component}
 
+load_functions_with_decorator()
 
-def pick_page(current_page=None, key=''):
+def pick_page(current_page: Optional[int] = None, key: str = '') -> None:
+    """
+    Sets the current page in Streamlit session state.
+
+    Args:
+        current_page (Optional[int]): The current page number.
+        key (str): The session state key for the current page.
+    """
     st.session_state[key] = current_page
 
 
 def default_filter_callback(query: str, page_size: int, current_page: int, df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Filters a DataFrame based on a query and returns a paginated subset.
+
+    Args:
+        query (str): The query string to filter the DataFrame.
+        page_size (int): The number of rows per page.
+        current_page (int): The current page number.
+        df (pd.DataFrame): The DataFrame to filter.
+
+    Returns:
+        pd.DataFrame: The filtered and paginated DataFrame.
+    """
     start_idx = current_page * page_size
     end_idx = start_idx + page_size
     if query:
@@ -63,32 +92,28 @@ def default_filter_callback(query: str, page_size: int, current_page: int, df: p
         return df.iloc[start_idx:end_idx]
 
 
-def default_filter_callback(query: str, page_size: int, current_page: int, df) -> pd.DataFrame:
-    start_idx = current_page * page_size
-    end_idx = start_idx + page_size
-    if query:
-        filtered_df = df.query(query)
-        return filtered_df.iloc[start_idx:end_idx]
-    else:
-        return df.iloc[start_idx:end_idx]
-
-
-def process_dataframe(df: pd.DataFrame, columns_length: Optional[list] = None,
-                      filter: bool = None,
-                      filter_callback: Optional[Callable[[str, int, int], pd.DataFrame]] = default_filter_callback,
-                      key: str = "process_dataframe_key", page_size_num: int = 5) -> None:
+def process_dataframe(
+        df: pd.DataFrame,
+        columns_length: Optional[list] = None,
+        filter: bool = None,
+        filter_callback: Optional[Callable[[str, int, int, pd.DataFrame], pd.DataFrame]] = default_filter_callback,
+        key: str = "process_dataframe_key",
+        page_size_num: int = 5) -> None:
+    global custom_functions
     """
     Processes each value in the DataFrame, passing it to a function based on the column's data type.
 
     Args:
         df (pd.DataFrame): The DataFrame to process.
-        package_root (str): The root package to scan for functions with the @type_matcher decorator.
-        strict (bool): If True, raises an exception if there is no corresponding function for a column's data type.
+        columns_length (Optional[list]): List of column lengths.
+        filter (bool): Whether to apply filtering.
+        filter_callback (Optional[Callable[[str, int, int, pd.DataFrame], pd.DataFrame]]): Callback for filtering the DataFrame.
+        key (str): Session state key for the DataFrame.
+        page_size_num (int): Number of rows per page.
 
     Returns:
         None
     """
-
     logger = logging.getLogger(__name__)
     key_page_size = key + 'PAGE_SIZE'
     key_current_page = key + 'current_page'
@@ -107,12 +132,11 @@ def process_dataframe(df: pd.DataFrame, columns_length: Optional[list] = None,
             st.error(f"Query failed: {e}")
             return
 
-    functions = load_functions_with_decorator()
-    functions.update(custom_functions)
+
     col_names = [c for c in df.columns.values if '_widget' not in c]
     handled_rows = 0
 
-    def decide_length(c):
+    def decide_length(c: Union[pandas.core.frame.DataFrame, str, float, int, np.int64, np.float32]) -> float:
         if isinstance(c, (pandas.core.frame.DataFrame,)):
             return 2
         elif isinstance(c, (str,)):
@@ -150,57 +174,55 @@ def process_dataframe(df: pd.DataFrame, columns_length: Optional[list] = None,
                         value = row[column]
                         column_type = type(value)
                         with columns[i]:
-                            if column in functions:
-                                func = functions[column]['function']
-                                component = functions[column]['component']
+                            if column in custom_functions:
+                                func = custom_functions[column]['function']
+                                component = custom_functions[column]['component']
                                 output = func(value, row)
                                 if component:
                                     component(output)
                                 else:
                                     print(f"Output for {value} in column {column}: {output}")
-                            elif column_type in functions:
-                                func = functions[column_type]['function']
-                                component = functions[column_type]['component']
+                            elif column_type in custom_functions:
+                                func = custom_functions[column_type]['function']
+                                component = custom_functions[column_type]['component']
                                 output = func(value, row)
                                 if component:
                                     component(output)
                                 else:
                                     print(f"Output for {value} in column {column}: {output}")
                             else:
-
                                 message = f"No registered function for processing type '{column_type.__name__}' in column '{column}'."
                                 st.write(message)
                                 logger.warning(message)
         columns = st.columns(10)
-
-        current_selected_page = st.session_state.get(key_current_page, 0)
-        for page_number, c in enumerate(columns):
-            button_key = f'page_{page_number}_clicked'
-            with c:
-                if page_number == current_selected_page:
-                    st.markdown(
-                        """
-                        <style>
-                        .element-container:has(style){
-                            display: none;
-                        }
-                        #button-after {
-                            display: none;
-                        }
-                        .element-container:has(#button-after) {
-                            display: none;
-                        }
-                        .element-container:has(#button-after) + div button {
-                            background-color: orange;
+        if filter:
+            current_selected_page = st.session_state.get(key_current_page, 0)
+            for page_number, c in enumerate(columns):
+                button_key = f'page_{page_number}_clicked'
+                with c:
+                    if page_number == current_selected_page:
+                        st.markdown(
+                            """
+                            <style>
+                            .element-container:has(style){
+                                display: none;
                             }
-                        </style>
-                        """,
-                        unsafe_allow_html=True,
-                    )
-
-                    st.button(f'** {page_number + 1}', key=button_key,
-                              on_click=functools.partial(pick_page, page_number, key_current_page))
-                    st.markdown('<span id="button-after"></span>', unsafe_allow_html=True)
-                else:
-                    st.button(f'{page_number + 1}', key=button_key,
-                              on_click=functools.partial(pick_page, page_number, key_current_page))
+                            #button-after {
+                                display: none;
+                            }
+                            .element-container:has(#button-after) {
+                                display: none;
+                            }
+                            .element-container:has(#button-after) + div button {
+                                background-color: orange;
+                                }
+                            </style>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                        st.button(f'** {page_number + 1}', key=button_key,
+                                  on_click=functools.partial(pick_page, page_number, key_current_page))
+                        st.markdown('<span id="button-after"></span>', unsafe_allow_html=True)
+                    else:
+                        st.button(f'{page_number + 1}', key=button_key,
+                                  on_click=functools.partial(pick_page, page_number, key_current_page))

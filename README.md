@@ -1,3 +1,82 @@
+# Streamlit Table with WebSocket and React Components
+
+A project that showcases a table for working with Streamlit, featuring WebSocket integration and the ability to add functions to columns or data types. This project includes examples of custom React components that communicate via WebSocket, avoiding page reloads typically triggered by Streamlit's actions.
+
+## Contents
+
+- [About the Project](#about-the-project)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Examples](#examples)
+- [Contribution](#contribution)
+- [License](#license)
+
+## About the Project
+
+This project provides a robust example of integrating WebSocket and React components with Streamlit. It demonstrates how to avoid page reloads by using WebSocket events and React, which allows for a smoother user experience.
+
+Features:
+- Table with the ability to add functions to columns or data types.
+- Custom React components that communicate via WebSocket.
+- Avoids page reloads by leveraging WebSocket and React integration.
+
+## Installation
+
+To run this project, ensure you have the following installed:
+- Python
+- npm
+
+Follow these steps to set up the project:
+
+1. Clone the repository:
+    ```sh
+    git clone https://github.com/seedoogithub/streamlitextend.git
+    ```
+
+2. Navigate to the project directory:
+    ```sh
+    cd streamlitextend
+    ```
+
+3. Install the Python package:
+    ```sh
+    pip install -e ./
+    ```
+
+4. Navigate to the frontend directory:
+    ```sh
+    cd seedoo/streamlit/frontend
+    ```
+
+5. Install npm dependencies:
+    ```sh
+    npm install
+    ```
+
+6. Build the npm project:
+    ```sh
+    npm run build
+    ```
+
+7. Navigate back to the Streamlit directory:
+    ```sh
+    cd ../../
+    ```
+
+8. Run the Streamlit application:
+    ```sh
+    streamlit run app.py
+    ```
+
+## Usage
+
+The project includes examples demonstrating how to work with the table and custom components.
+
+### Example Code (app.py)
+
+Below is a simple example of using a table and a modal that can be opened via WebSocket events.
+
+```python
 import streamlit as st
 import seedoo.streamlit.event_server
 from concurrent.futures import ThreadPoolExecutor

@@ -130,7 +130,11 @@ class WebSocketServer:
     def _send_data_async(self, data):
         try:
             data_as_json_string = json.dumps(data)
-            key = os.path.join("/ws", data['id'])
+            if os.name == 'nt':
+                key = f"/ws/{data['id']}"
+            else:
+                key = os.path.join("/ws", data['id'])
+
             client = asyncio.run(self.client_for_key(key, self.timeout))
 
             if client and client.open:

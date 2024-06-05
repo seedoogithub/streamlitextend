@@ -6,7 +6,10 @@ build-backend = "setuptools.build_meta"
 name = "seedoo.streamlit"
 version = "1.0"
 description = "Tools as part of seedoo.streamlit package"
-dependencies = []
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
 
 [project.license]
 text = "MIT"
