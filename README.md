@@ -161,3 +161,23 @@ if __name__ == "__main__":
 
     # Process the DataFrame to display it in Streamlit with registered functions
     process_dataframe(df)
+```
+Also the possibility of using the load_functions_with_decorator function to scan a module in your project for functions for the table. There are two types of decorators: one for data types and one for column names.
+Example module:
+```paython
+from typing import Any
+from PIL import Image
+import streamlit as st
+from seedoo.streamlit.utils.decorators import type_matcher, column_name_matcher
+
+@type_matcher(dict, st.json)
+def process_dict(value: dict, row: Any = None) -> dict:
+    value['processed'] = True
+    return value
+```
+Before displaying the table, call the function:
+```paython
+from seedoo.streamlit.utils.data_processor import load_functions_with_decorator
+
+load_functions_with_decorator('path.to.module.example_module')
+
