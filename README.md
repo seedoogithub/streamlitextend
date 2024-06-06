@@ -195,6 +195,6 @@ load_functions_with_decorator('path.to.module.example_module')
 ```
 
 
-## Ліцензія
+## License
 
-Цей проект ліцензований за умовами [Apache License 2.0](LICENSE).
+This project is licensed under the terms [Apache License 2.0](LICENSE).
