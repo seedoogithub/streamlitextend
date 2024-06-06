@@ -67,7 +67,19 @@ Follow these steps to set up the project:
     ```sh
     streamlit run app.py
     ```
+### Changing the WebSocket Port
 
+To change the WebSocket port, use the environment variable:
+
+```bash
+SEEDOO_WEBSOCKET_EVENT_PORT=9897
+```
+If this environment variable is not set, the default port is 9897.
+### Setting Up HTTPS with Nginx
+
+This project includes a script to set up HTTPS with Nginx. The script is located at:
+'streamlitextend\seedoo\streamlit\nginx_https.sh'
+To start the project with Nginx using HTTPS, run this script.
 ## Usage
 
 The project includes examples demonstrating how to work with the table and custom components.
@@ -180,4 +192,9 @@ Before displaying the table, call the function:
 from seedoo.streamlit.utils.data_processor import load_functions_with_decorator
 
 load_functions_with_decorator('path.to.module.example_module')
+```
 
+
+## Ліцензія
+
+Цей проект ліцензований за умовами [Apache License 2.0](LICENSE).
