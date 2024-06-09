@@ -2,6 +2,7 @@
 
 A project that showcases a table for working with Streamlit, featuring WebSocket integration and the ability to add functions to columns or data types. This project includes examples of custom React components that communicate via WebSocket, avoiding page reloads typically triggered by Streamlit's actions.
 
+The buil in app.py under seedoo/streamlit folder, has a fully working example. 
 ## Contents
 
 - [About the Project](#about-the-project)
