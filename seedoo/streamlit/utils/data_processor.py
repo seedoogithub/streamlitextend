@@ -58,7 +58,7 @@ def load_functions_with_decorator(package_root="seedoo.streamlit.module.default_
                             custom_functions[key] = {'function': func, 'component': func._component}
 
 load_functions_with_decorator()
-
+print('load-----------')
 def pick_page(current_page: Optional[int] = None, key: str = '') -> None:
     """
     Sets the current page in Streamlit session state.
@@ -91,6 +91,11 @@ def default_filter_callback(query: str, page_size: int, current_page: int, df: p
     else:
         return df.iloc[start_idx:end_idx]
 
+
+def go_to_first_page(key):
+    key_current_page = key + 'current_page'
+    if key_current_page in st.session_state:
+        st.session_state[key_current_page] = 0
 
 def process_dataframe(
         df: pd.DataFrame,
@@ -125,7 +130,9 @@ def process_dataframe(
     current_page = st.session_state.get(key_current_page, 0)
 
     if filter:
-        query = st.text_input("Enter your query (e.g., id == 54):", key=key + 'query')
+        def change_input_one():
+            go_to_first_page(key)
+        query = st.text_input("Enter your query (e.g., id == 54):", key=key + 'query',on_change=change_input_one)
         try:
             df = filter_callback(query, PAGE_SIZE, current_page, df)
         except Exception as e:
