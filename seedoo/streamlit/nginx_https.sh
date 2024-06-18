@@ -54,8 +54,6 @@ fi
 # Set up authentication
 #echo "Setting up authentication..."
 sudo htpasswd -cb /etc/nginx/.htpasswd $USERNAME $PASSWORD
-#ADD ANOTHER USER
-sudo htpasswd -b /etc/nginx/.htpasswd 'gal' '&d&#HKXcer3$TmKN'
 
 # Configure nginx
 echo "Configuring nginx..."

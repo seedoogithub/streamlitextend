@@ -1,6 +1,8 @@
 import os
 import importlib
 import inspect
+import traceback
+
 import pandas as pd
 from typing import Callable, Dict, Optional, Union
 import logging
@@ -103,7 +105,7 @@ def process_dataframe(
         filter: bool = None,
         filter_callback: Optional[Callable[[str, int, int, pd.DataFrame], pd.DataFrame]] = default_filter_callback,
         key: str = "process_dataframe_key",
-        page_size_num: int = 5) -> None:
+        page_size_num: int = 5, strict = False) -> None:
     global custom_functions
     """
     Processes each value in the DataFrame, passing it to a function based on the column's data type.
@@ -136,8 +138,9 @@ def process_dataframe(
         try:
             df = filter_callback(query, PAGE_SIZE, current_page, df)
         except Exception as e:
-            st.error(f"Query failed: {e}")
-            return
+            st.error(f"Query failed: {traceback.format_exc()}")
+            raise
+
 
 
     col_names = [c for c in df.columns.values if '_widget' not in c]
@@ -187,16 +190,17 @@ def process_dataframe(
                                 output = func(value, row)
                                 if component:
                                     component(output)
-                                else:
-                                    print(f"Output for {value} in column {column}: {output}")
+                                elif strict:
+                                    raise RuntimeError(f"Output for {value} in column {column}: {output}")
+
                             elif column_type in custom_functions:
                                 func = custom_functions[column_type]['function']
                                 component = custom_functions[column_type]['component']
                                 output = func(value, row)
                                 if component:
                                     component(output)
-                                else:
-                                    print(f"Output for {value} in column {column}: {output}")
+                                elif strict:
+                                    raise RuntimeError(f"Output for {value} in column {column}: {output}")
                             else:
                                 message = f"No registered function for processing type '{column_type.__name__}' in column '{column}'."
                                 st.write(message)
