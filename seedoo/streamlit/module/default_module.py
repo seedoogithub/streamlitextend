@@ -23,7 +23,7 @@ def process_int(value: list, row: Any = None) -> list:
 
 @type_matcher(float, st.write)
 def process_float(value: float, row: Any = None) -> list:
-    return str(value)
+    return f"{value:.2f}"
 
 @column_name_matcher('list_column', st.write)
 def create_image(value: Any, row: Any = None) -> Image.Image:
