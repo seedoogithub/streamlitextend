@@ -66,7 +66,7 @@ if __name__ == "__main__":
                 'value_one': value_one
             })
 
-        return st.text_input('text', key='input' + value, on_change=change_input_one)
+        return st.text_input('text', key='input' + value,label_visibility="collapsed", on_change=change_input_one)
 
 
     # Register custom functions for 'modal_button' and 'input' columns
