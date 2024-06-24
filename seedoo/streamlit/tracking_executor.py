@@ -4,6 +4,12 @@ from threading import Lock, Thread
 import time
 import functools
 
+
+def safe_name(fn):
+    if isinstance(fn, functools.partial):
+        return fn.func.__name__
+    return fn.__name__
+
 class TrackingThreadPoolExecutor(ThreadPoolExecutor):
     def __init__(self, max_workers=None, thread_name_prefix='', timeout=10):
         super().__init__(max_workers=max_workers, thread_name_prefix=thread_name_prefix)
@@ -19,7 +25,7 @@ class TrackingThreadPoolExecutor(ThreadPoolExecutor):
     def submit(self, fn, *args, **kwargs):
         with self._lock:
             self._active_threads += 1
-        self.logger.debug(f'Submitting task: {fn.__name__} with args: {args} and kwargs: {kwargs}')
+        self.logger.debug(f'Submitting task: {safe_name(fn)} with args: {args} and kwargs: {kwargs}')
         future = super().submit(self._wrapped_fn, fn, *args, **kwargs)
         future._start_time = time.time()  # Store the start time
         with self._lock:
@@ -32,7 +38,7 @@ class TrackingThreadPoolExecutor(ThreadPoolExecutor):
         finally:
             with self._lock:
                 self._active_threads -= 1
-                self.logger.debug(f'Task {fn.__name__} completed.')
+                self.logger.debug(f'Task {safe_name(fn)} completed.')
         return result
 
     def _monitor(self):

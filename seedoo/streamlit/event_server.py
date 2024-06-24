@@ -6,7 +6,7 @@ import websockets.exceptions
 import threading
 import msgpack
 import json
-from seedoo.streamlit.tracking_executor import TrackingThreadPoolExecutor
+from seedoo.streamlit.tracking_executor import TrackingThreadPoolExecutor, safe_name
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import time
 import os
@@ -14,11 +14,6 @@ import functools
 import weakref
 from streamlit.runtime.scriptrunner import add_script_run_ctx
 SEEDOO_SEMAPHORE_NAME = 'seedoo_ux_semaphore'
-
-def safe_name(fn):
-    if isinstance(fn, functools.partial):
-        return fn.func.__name__
-    return fn.__name__
 
 class WebSocketServer:
     _instance = None
