@@ -44,7 +44,7 @@ class TrackingThreadPoolExecutor(ThreadPoolExecutor):
     def _monitor(self):
         while True:
             self.logger.debug('Checking tasks for timeout...')
-            self.logger.info(f'{self._thread_name_prefix} executor, active threads: {self.active_threads}')
+            self.logger.debug(f'{self._thread_name_prefix} executor, active threads: {self.active_threads}')
             ratio = self.active_threads / self._max_workers
 
 
