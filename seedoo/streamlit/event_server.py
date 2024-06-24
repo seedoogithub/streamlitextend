@@ -6,12 +6,19 @@ import websockets.exceptions
 import threading
 import msgpack
 import json
+from seedoo.streamlit.tracking_executor import TrackingThreadPoolExecutor
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import time
 import os
+import functools
 import weakref
 from streamlit.runtime.scriptrunner import add_script_run_ctx
 SEEDOO_SEMAPHORE_NAME = 'seedoo_ux_semaphore'
+
+def safe_name(fn):
+    if isinstance(fn, functools.partial):
+        return fn.func.__name__
+    return fn.__name__
 
 class WebSocketServer:
     _instance = None
@@ -41,7 +48,7 @@ class WebSocketServer:
         self.initialized_contexts = False
         self.running_server = None
         num_cpus = multiprocessing.cpu_count()
-        self.thread_pool_executor = ThreadPoolExecutor(max_workers=80)
+        self.thread_pool_executor = TrackingThreadPoolExecutor(max_workers=80, timeout = 30)
 
         def empty():
             return
@@ -59,31 +66,46 @@ class WebSocketServer:
         websocket.is_component_ready = False
         print(path)
         if path.startswith('/ws/functions') or path.startswith('/wss/functions'):
-            print('IN FUNCTIONS')
             while True:
+                target_function_name = ''
                 try:
                     target_function = os.path.basename(path)
+                    target_function_name = target_function_name
                     message = await asyncio.wait_for(websocket.recv(), timeout=self.timeout)  # 10-second timeout
-                    if target_function in self.paths:
+                    if target_function not in self.paths:
+                        self.logger.critical(f'Target requested function: {target_function} is not registered.')
+                    else:
                         try:
                             target_function = self.paths[target_function]
+                            target_function_name = safe_name(target_function)
+                            self.logger.info(f'Executing function: {target_function_name}')
+                            start = time.time()
                             message_data = json.loads(message)
+                            duration = (time.time() - start) * 1000
+                            (self.logger.warning if duration > 50 else self.logger.debug)(f'message data json load: {duration} ms')
+
+                            start = time.time()
                             response = target_function(message_data)
+                            duration = (time.time() - start) * 1000
+                            (self.logger.warning if duration > 500 else self.logger.debug)(f'function {target_function_name} executed for {duration} ms')
+
                             if message_data.get('binary'):
+                                self.logger.info('Sending binary response')
                                 binary_data = msgpack.packb(response, use_bin_type=True)
                                 await websocket.send(binary_data)
                             else:
+                                self.logger.info('Sending text json response')
                                 await websocket.send(json.dumps(response))
 
                         except Exception as exc:
-                            self.logger.exception(f'Error in calling target function: {target_function} on path {path}, message was: {message}')
-                    else:
-                        self.logger.warning(f'Received target function: {target_function}  on path {path} but not target registered for this name')
+                            self.logger.exception(f'Error in calling target function: {target_function_name} on path {path}, message was: {message}')
                 except (websockets.exceptions.ConnectionClosedOK, websockets.exceptions.ConnectionClosedError):
-                    self.logger.warning('Error in communicating with socket')
+                    self.logger.warning(f'Error in communicating with socket for function: {target_function_name}')
                     break
                 except asyncio.TimeoutError as exc:
+                    self.logger.warning('Asyncio timeout')
                     if not websocket.open:
+                        self.logger.warning('Closing socket - Asyncio timeout')
                         break
                 except Exception as exc:
                     self.logger.exception('Error in socket handler')
@@ -105,9 +127,11 @@ class WebSocketServer:
                         self.logger.warning('Error in communicating with socket')
                         break
                     except asyncio.TimeoutError as exc:
+                        self.logger.warning('Asyncio timeout')
                         if not websocket.open:
+                            self.logger.warning('Closing socket - Asyncio timeout')
                             break
-                        # self.clients.pop(path)
+
 
                     except Exception as exc:
                         self.logger.exception('Error in socket handler')
@@ -184,15 +208,14 @@ class WebSocketServer:
             self.thread_pool_executor.submit(wrapper)
 
     def register_callback(self, id, callback_function):
+        self.logger.info(f'Registered callback: {safe_name(callback_function)}')
         if callback_function is not None:
             self.callbacks[id] = callback_function
 
     def register_function(self, target_function):
-        if hasattr(target_function, '__name__'):
-            self.paths[target_function.__name__] = target_function
-        else:
-            self.paths[target_function.func.__name__] = target_function
-
+        func_name = safe_name(target_function)
+        self.logger.info(f'Registered function: {func_name}')
+        self.paths[func_name] = target_function
 
 
     def __del__(self):
