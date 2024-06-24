@@ -3,6 +3,25 @@ from concurrent.futures import ThreadPoolExecutor, Future, as_completed
 from threading import Lock, Thread
 import time
 import functools
+import ctypes
+import threading
+import inspect
+
+class ThreadInterrupted(Exception):
+    pass
+
+# Helper function to send an exception to the thread to stop it
+def _async_raise(tid, exctype):
+    tid = ctypes.c_long(tid)
+    if not inspect.isclass(exctype):
+        exctype = type(exctype)
+    res = ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, ctypes.py_object(exctype))
+    if res == 0:
+        raise ValueError("Invalid thread id")
+    elif res != 1:
+        ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, None)
+        raise SystemError("PyThreadState_SetAsyncExc failed")
+
 
 
 def safe_name(fn):
@@ -22,24 +41,29 @@ class TrackingThreadPoolExecutor(ThreadPoolExecutor):
         self._monitor_thread.daemon = True
         self._monitor_thread.start()
 
+
     def submit(self, fn, *args, **kwargs):
+        wrapped_fn = self._wrap_fn(fn)
+        future = super().submit(wrapped_fn, *args, **kwargs)
         with self._lock:
-            self._active_threads += 1
+            future._start_time = time.time()
+            self._futures.append((future, wrapped_fn))
         self.logger.debug(f'Submitting task: {safe_name(fn)} with args: {args} and kwargs: {kwargs}')
-        future = super().submit(self._wrapped_fn, fn, *args, **kwargs)
-        future._start_time = time.time()  # Store the start time
-        with self._lock:
-            self._futures.append(future)
         return future
 
-    def _wrapped_fn(self, fn, *args, **kwargs):
-        try:
-            result = fn(*args, **kwargs)
-        finally:
-            with self._lock:
-                self._active_threads -= 1
-                self.logger.debug(f'Task {safe_name(fn)} completed.')
-        return result
+    def _wrap_fn(self, fn):
+        @functools.wraps(fn)
+        def wrapped(*args, **kwargs):
+            wrapped.thread_id = threading.get_ident()
+            wrapped._start_time = time.time()
+            try:
+                result = fn(*args, **kwargs)
+                return result
+            except Exception as e:
+                raise e
+        return wrapped
+
+
 
     def _monitor(self):
         while True:
@@ -51,20 +75,22 @@ class TrackingThreadPoolExecutor(ThreadPoolExecutor):
             (self.logger.warning if ratio > 0.5 else self.logger.debug)(f'{self._thread_name_prefix} executor utilization: {ratio:.2%}')
 
             with self._lock:
-                for future in self._futures:
-                    self.logger.debug(f'Checking task: {future}')
+                for future, wrapped_fn in self._futures:
+                    self.logger.info(f'Checking task: {future}')
                     duration = (time.time() - future._start_time)
                     if future.running():
                         if duration > self._timeout:
                             self.logger.critical(f'Task {future} is running for {duration} longer than {self._timeout} seconds and will be cancelled.')
-                            future.cancel()
-                        if duration > self._timeout * 0.5:
+                            if wrapped_fn.thread_id:
+                                _async_raise(wrapped_fn.thread_id, ThreadInterrupted)
+
+                        elif duration > self._timeout * 0.5:
                             ratio = duration / self._timeout
                             self.logger.warning(
                                 f'Task {future} is running for {duration} which is {ratio:.2%} of the timeout and will soon will be cancelled')
 
                 # Clean up completed futures
-                self._futures = [f for f in self._futures if not f.done()]
+                self._futures = [(f, wrapped_fn) for f, wrapped_fn in self._futures if not f.done()]
             time.sleep(1)
 
     @property
@@ -78,13 +104,18 @@ class TrackingThreadPoolExecutor(ThreadPoolExecutor):
 
 # Example usage
 def task(n):
-    time.sleep(n)
-    return n
+
+    try:
+        time.sleep(n)
+        return n
+    except ThreadInterrupted as exc:
+        print('ThreadInterrupted called!')
+        raise
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     max_workers = 5
-    timeout = 3  # Set timeout for task execution
+    timeout =  2 # Set timeout for task execution
     with TrackingThreadPoolExecutor(max_workers=max_workers, timeout=timeout) as executor:
         futures = [executor.submit(task, i) for i in range(10)]
         for future in as_completed(futures):
