@@ -43,7 +43,7 @@ class WebSocketServer:
         self.initialized_contexts = False
         self.running_server = None
         num_cpus = multiprocessing.cpu_count()
-        self.thread_pool_executor = TrackingThreadPoolExecutor(max_workers=80, timeout = 30)
+        self.thread_pool_executor = TrackingThreadPoolExecutor(max_workers=80, timeout = 180)
 
         def empty():
             return
