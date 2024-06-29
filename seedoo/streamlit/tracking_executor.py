@@ -34,7 +34,6 @@ class TrackingThreadPoolExecutor(ThreadPoolExecutor):
         super().__init__(max_workers=max_workers, thread_name_prefix=thread_name_prefix)
         self._lock = Lock()
         self.logger = logging.getLogger(__name__)
-        self._active_threads = 0
         self._futures = []
         self._timeout = timeout
         self._monitor_thread = Thread(target=self._monitor)
@@ -68,7 +67,7 @@ class TrackingThreadPoolExecutor(ThreadPoolExecutor):
     def _monitor(self):
         while True:
             self.logger.debug('Checking tasks for timeout...')
-            self.logger.debug(f'{self._thread_name_prefix} executor, active threads: {self.active_threads}')
+            self.logger.info(f'{self._thread_name_prefix} executor, active threads: {self.active_threads}')
             ratio = self.active_threads / self._max_workers
 
 
@@ -76,7 +75,7 @@ class TrackingThreadPoolExecutor(ThreadPoolExecutor):
 
             with self._lock:
                 for future, wrapped_fn in self._futures:
-                    self.logger.info(f'Checking task: {future}')
+                    self.logger.debug(f'Checking task: {future}')
                     duration = (time.time() - future._start_time)
                     if future.running():
                         if duration > self._timeout:
@@ -84,7 +83,7 @@ class TrackingThreadPoolExecutor(ThreadPoolExecutor):
                             if wrapped_fn.thread_id:
                                 _async_raise(wrapped_fn.thread_id, ThreadInterrupted)
 
-                        elif duration > self._timeout * 0.5:
+                        elif duration > self._timeout * 0.98:
                             ratio = duration / self._timeout
                             self.logger.warning(
                                 f'Task {future} is running for {duration} which is {ratio:.2%} of the timeout and will soon will be cancelled')
@@ -96,7 +95,7 @@ class TrackingThreadPoolExecutor(ThreadPoolExecutor):
     @property
     def active_threads(self):
         with self._lock:
-            return self._active_threads
+            return len(self._futures)
 
     @property
     def idling_threads(self):

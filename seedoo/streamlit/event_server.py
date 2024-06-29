@@ -37,13 +37,13 @@ class WebSocketServer:
         self.logger = logging.getLogger(__name__)
         self.port = port
         self.callbacks = {}
-        self.timeout = 300
+        self.timeout = 30
         self.paths = {}
         self.is_running = False
         self.initialized_contexts = False
         self.running_server = None
         num_cpus = multiprocessing.cpu_count()
-        self.thread_pool_executor = TrackingThreadPoolExecutor(max_workers=80, timeout = 180)
+        self.thread_pool_executor = TrackingThreadPoolExecutor(max_workers=80, timeout = 60)
 
         def empty():
             return
