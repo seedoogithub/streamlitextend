@@ -96,10 +96,21 @@ class WebSocketWrapper {
 
     const sendWhenReady = () => {
       if (this.ws.readyState === WebSocket.OPEN) {
-        const jsonString = JSON.stringify(data);
-        this.ws.send(jsonString);
+        try {
+          const accessToken = JSON.parse(localStorage.getItem('b97174ee-38fc-46e6-ac06-c013ee14a825'))['accessToken']
+          data['accessToken'] = accessToken
+          const jsonString = JSON.stringify(data);
+          this.ws.send(jsonString);
+          console.log("Data sent to server with token:", jsonString);
+        }catch (e) {
+          const jsonString = JSON.stringify(data);
+          this.ws.send(jsonString);
+          console.log("Data sent to server:", jsonString);
+        }
+
+
         // start = Date.now()
-        console.log("Data sent to server:", jsonString);
+
       } else if (this.ws.readyState === WebSocket.CONNECTING) {
         console.warn("WebSocket connection is opening", this.comopnent_id);
 

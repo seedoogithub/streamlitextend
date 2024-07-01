@@ -13,7 +13,9 @@ import os
 import functools
 import weakref
 from streamlit.runtime.scriptrunner import add_script_run_ctx
+
 SEEDOO_SEMAPHORE_NAME = 'seedoo_ux_semaphore'
+
 
 class WebSocketServer:
     _instance = None
@@ -41,9 +43,10 @@ class WebSocketServer:
         self.paths = {}
         self.is_running = False
         self.initialized_contexts = False
+        self.tokens_store = None
         self.running_server = None
         num_cpus = multiprocessing.cpu_count()
-        self.thread_pool_executor = TrackingThreadPoolExecutor(max_workers=80, timeout = 180)
+        self.thread_pool_executor = TrackingThreadPoolExecutor(max_workers=80, timeout=180)
 
         def empty():
             return
@@ -51,7 +54,7 @@ class WebSocketServer:
         for _ in range(20):
             self.thread_pool_executor.submit(empty)
 
-        self.clients = {} # Keep track of connected clients
+        self.clients = {}  # Keep track of connected clients
 
     async def handler(self, websocket, path):
         self.logger.info(f"CONNECTED {path}")
@@ -77,23 +80,34 @@ class WebSocketServer:
                             start = time.time()
                             message_data = json.loads(message)
                             duration = (time.time() - start) * 1000
-                            (self.logger.warning if duration > 50 else self.logger.debug)(f'message data json load: {duration} ms')
+                            (self.logger.warning if duration > 50 else self.logger.debug)(
+                                f'message data json load: {duration} ms')
 
                             start = time.time()
                             response = target_function(message_data)
                             duration = (time.time() - start) * 1000
-                            (self.logger.warning if duration > 500 else self.logger.debug)(f'function {target_function_name} executed for {duration} ms')
-
-                            if message_data.get('binary'):
-                                self.logger.info('Sending binary response')
-                                binary_data = msgpack.packb(response, use_bin_type=True)
-                                await websocket.send(binary_data)
+                            (self.logger.warning if duration > 500 else self.logger.debug)(
+                                f'function {target_function_name} executed for {duration} ms')
+                            if self.tokens_store:
+                                if 'accessToken' in message_data:
+                                    accessToken = message_data['accessToken']
+                                    if self.tokens_store.check_valid(accessToken):
+                                        if message_data.get('binary'):
+                                            self.logger.info('Sending binary response')
+                                            binary_data = msgpack.packb(response, use_bin_type=True)
+                                            await websocket.send(binary_data)
+                                        else:
+                                            self.logger.info('Sending text json response')
+                                            await websocket.send(json.dumps(response))
+                                    else:
+                                        websocket.send(json.dumps({'error': 'not login'}))
+                                else:
+                                    websocket.send(json.dumps({'error': 'not login'}))
                             else:
-                                self.logger.info('Sending text json response')
-                                await websocket.send(json.dumps(response))
-
+                                websocket.send(json.dumps({'error': 'not login'}))
                         except Exception as exc:
-                            self.logger.exception(f'Error in calling target function: {target_function_name} on path {path}, message was: {message}')
+                            self.logger.exception(
+                                f'Error in calling target function: {target_function_name} on path {path}, message was: {message}')
                 except (websockets.exceptions.ConnectionClosedOK, websockets.exceptions.ConnectionClosedError):
                     self.logger.warning(f'Error in communicating with socket for function: {target_function_name}')
                     break
@@ -113,10 +127,22 @@ class WebSocketServer:
                         message = await asyncio.wait_for(websocket.recv(), timeout=self.timeout)  # 10-second timeout
                         message = json.loads(message)
                         key = message['id']
+
                         websocket.is_component_ready = True
 
                         if key in self.callbacks:
-                            self.thread_pool_executor.submit(self.callbacks[key], message)
+                            if self.tokens_store:
+                                if 'accessToken' in message:
+                                    accessToken = message['accessToken']
+                                    if self.tokens_store.check_valid(accessToken):
+                                        self.thread_pool_executor.submit(self.callbacks[key], message)
+                                    else:
+                                        self.send_data({'id': key, 'error': 'not login'}),
+
+                                else:
+                                    self.send_data({'id': key, 'error': 'not login'})
+                            else:
+                                self.send_data({'id': key, 'error': 'not login'})
 
                     except (websockets.exceptions.ConnectionClosedOK, websockets.exceptions.ConnectionClosedError):
                         self.logger.warning('Error in communicating with socket')
@@ -158,7 +184,7 @@ class WebSocketServer:
 
             if client and client.open:
                 asyncio.run(client.send(data_as_json_string))
-                #await asyncio.wait_for(, timeout=self.timeout)
+                # await asyncio.wait_for(, timeout=self.timeout)
                 self.logger.info(f'Sent for {key}')
             else:
                 if client is None:
@@ -172,14 +198,14 @@ class WebSocketServer:
         self.thread_pool_executor.submit(self._send_data_async, data)
 
     async def _start_server_async(self):
-        server = await websockets.serve(self.handler, self.host, self.port, ping_interval = 5, ping_timeout=self.timeout)
+        server = await websockets.serve(self.handler, self.host, self.port, ping_interval=5, ping_timeout=self.timeout)
         self.running_server = server
         self.logger.info(f"WebSocket server started at wss://{self.host}:{self.port}")
         await server.wait_closed()
 
-
     def start_server(self):  # Regular method
         self.logger.info("STARTING SERVER!!")
+
         def run():
             loop = asyncio.new_event_loop()
             self.loop = loop
@@ -190,13 +216,13 @@ class WebSocketServer:
             self.server_thread = threading.Thread(target=run)
             self.server_thread.start()
 
-    def execute_function_and_send_result(self, callback_function,  *args, **kwargs):
+    def execute_function_and_send_result(self, callback_function, *args, **kwargs):
         if callback_function:
             def wrapper():
                 try:
                     data = callback_function(*args, **kwargs)
                     self.send_data(data)
-                    #self._send_data_async(data, json.dumps(data))
+                    # self._send_data_async(data, json.dumps(data))
                 except Exception as exc:
                     self.logger.exception('Error in calling callback')
 
@@ -211,7 +237,6 @@ class WebSocketServer:
         func_name = safe_name(target_function)
         self.logger.info(f'Registered function: {func_name}')
         self.paths[func_name] = target_function
-
 
     def __del__(self):
         # Close client websockets
@@ -232,12 +257,14 @@ class WebSocketServer:
         # For now, just log a message
         self.logger.info("WebSocketServer instance is being destroyed")
 
+
 import atexit
+
 
 def cleanup():
     # Call the C function to destroy the lock
     del WebSocketServer._instance
 
+
 # Register the cleanup function
 atexit.register(cleanup)
-

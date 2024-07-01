@@ -76,7 +76,7 @@ class TrackingThreadPoolExecutor(ThreadPoolExecutor):
 
             with self._lock:
                 for future, wrapped_fn in self._futures:
-                    self.logger.info(f'Checking task: {future}')
+                    self.logger.debug(f'Checking task: {future}')
                     duration = (time.time() - future._start_time)
                     if future.running():
                         if duration > self._timeout:
@@ -84,7 +84,7 @@ class TrackingThreadPoolExecutor(ThreadPoolExecutor):
                             if wrapped_fn.thread_id:
                                 _async_raise(wrapped_fn.thread_id, ThreadInterrupted)
 
-                        elif duration > self._timeout * 0.5:
+                        elif duration > self._timeout * 0.98:
                             ratio = duration / self._timeout
                             self.logger.warning(
                                 f'Task {future} is running for {duration} which is {ratio:.2%} of the timeout and will soon will be cancelled')

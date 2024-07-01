@@ -6,9 +6,62 @@ from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ct
 import pandas as pd
 from seedoo.streamlit.widgets import websocket_button, modal
 from functools import partial
+from streamlit_msal import Msal
+from tokens_store import OurTokensStore
 
+from streamlit_login_auth_ui.widgets import __login__
+
+
+# __login__obj = __login__(auth_token = "courier_auth_token",
+#                     company_name = "Shims",
+#                     width = 200, height = 250,
+#                     logout_button_name = 'Logout', hide_menu_bool = False,
+#                     hide_footer_bool = False,
+#                     lottie_url = 'https://assets2.lottiefiles.com/packages/lf20_jcikwtux.json')
+#
+# LOGGED_IN= __login__obj.build_login_ui()
+# username= __login__obj.get_username()
+#
+# if LOGGED_IN == True:
+#
+#    st.markdown("Your Streamlit Application Begins here!")
+#    # st.markdown(st.session_state)
+#    st.write(username)
+
+
+with st.sidebar:
+    auth_data = Msal.initialize_ui(
+        client_id='b97174ee-38fc-46e6-ac06-c013ee14a825',
+        authority='https://login.microsoftonline.com/4cf3d54a-8a8b-4f92-95e6-51043c511c10',
+        scopes=["User.Read"], # Optional
+        # Customize (Default values):
+        connecting_label="Connecting",
+        disconnected_label="Disconnected",
+        sign_in_label="Sign in",
+        sign_out_label="Sign out"
+    )
+
+if auth_data:
+    st.session_state['LOGGED_IN'] = True
+else:
+    st.write("Authenticate to access protected content")
+    st.session_state['LOGGED_IN'] = False
+    st.stop()
+
+account = auth_data["account"]
+accessToken = auth_data['accessToken']
+
+name = account["name"]
+
+
+st.write(f"Hello {name}!")
+st.write("Protected content available")
 
 # Function to fetch the event server and thread pool
+@st.cache_resource(show_spinner=False)
+def initialize_tokens_store():
+    tokens_store = OurTokensStore()
+    return tokens_store
 @st.cache_resource(show_spinner=False)
 def fetch_event_server():
     if 'pool' not in st.session_state:
@@ -20,7 +73,7 @@ if __name__ == "__main__":
     import seedoo.streamlit.module.default_module
 
     event_server, asynch_pool = fetch_event_server()
-
+    tokens_store = initialize_tokens_store()
     # Initialize contexts for the event server
     if not event_server.initialized_contexts:
         for t in event_server.thread_pool_executor._threads:
@@ -32,9 +85,13 @@ if __name__ == "__main__":
             add_script_run_ctx(t)
 
         event_server.initialized_contexts = True
+    tokens_store.add(accessToken)
+    if not event_server.tokens_store:
+        event_server.tokens_store = tokens_store
 
     seedoo.streamlit.event_server.running_server = event_server
     event_server = seedoo.streamlit.event_server
+
 
     # Display a modal component
     modal('modal_id', 'modal_id_test')
@@ -45,7 +102,8 @@ if __name__ == "__main__":
         event_server.running_server.send_data({
             'id': 'modal_id',
             'showModal': True,
-            'event': 'similar'
+            'event': 'similar',
+            'accessToken': accessToken
         })
 
 
@@ -63,7 +121,8 @@ if __name__ == "__main__":
                 'id': 'modal_id',
                 'showModal': True,
                 'event': 'similar',
-                'value_one': value_one
+                'value_one': value_one,
+                'accessToken': accessToken
             })
 
         return st.text_input('text', key='input' + value,label_visibility="collapsed", on_change=change_input_one)
