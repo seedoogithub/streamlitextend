@@ -6,6 +6,8 @@ import websockets.exceptions
 import threading
 import msgpack
 import json
+import traceback
+import sys
 from seedoo.streamlit.tracking_executor import TrackingThreadPoolExecutor, safe_name
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import time
@@ -100,7 +102,7 @@ class WebSocketServer:
                 self.logger.warning(f'Error in communicating with socket for function: {target_function_name}')
                 break
             except asyncio.TimeoutError:
-                self.logger.warning('Asyncio timeout')
+                self.logger.debug('Asyncio timeout')
                 if not websocket.open:
                     self.logger.warning('Closing socket - Asyncio timeout')
                     break
@@ -109,6 +111,7 @@ class WebSocketServer:
 
     async def execute_target_function(self, websocket, target_function, message, path):
         target_function_name = safe_name(target_function)
+        id = 'default_this_means_did not load from message'
         try:
             self.logger.info(f'Executing function: {target_function_name}')
             start = time.time()
@@ -117,20 +120,59 @@ class WebSocketServer:
             (self.logger.warning if duration > 50 else self.logger.debug)(f'message data json load: {duration} ms')
 
             start = time.time()
-            response = await asyncio.get_running_loop().run_in_executor(self.thread_pool_executor, target_function, message_data)
+            try:
+                response = await asyncio.get_running_loop().run_in_executor(self.thread_pool_executor, target_function, message_data)
+                await asyncio.wait_for(self.send_response(websocket, message_data, response), timeout=self.timeout)
+            except asyncio.TimeoutError:
+                self.logger.critical(f'Timeout in sending respone back to client!, path: {path}')
+                if not websocket.open:
+                    self.logger.warning('Closing socket - Asyncio timeout')
+                    if path in self.clients:
+                        self.clients.pop(path)
+
+
+
             duration = (time.time() - start) * 1000
             (self.logger.warning if duration > 500 else self.logger.debug)(f'function {target_function_name} executed for {duration} ms')
 
-            await self.send_response(websocket, message_data, response)
+        except Exception as e:
+            try:
+                self.logger.exception(
+                    f'Error in calling target function: {target_function_name} on path {path}, message was: {message}')
+                # Extracting stack trace
+                exc_type, exc_value, exc_traceback = sys.exc_info()
 
-        except Exception as exc:
-            self.logger.exception(f'Error in calling target function: {target_function_name} on path {path}, message was: {message}')
+                # Extracting stack trace
+                tb = traceback.extract_tb(exc_traceback)
+                # Finding the first stack frame that belongs to this module
+
+                # Get the last frame in the traceback
+                deepest_frame = tb[-1]
+                function_name = deepest_frame.name
+                line_number = deepest_frame.lineno
+
+                message = f"{exc_value} (FN: {function_name}, LN:{line_number})"
+
+                error_message_data = {'id': id, 'event': 'message', 'data': {'message': message, 'type': 'error'}}
+                try:
+                    await asyncio.wait_for(self.send_response(websocket, {}, error_message_data), timeout=10)
+                except asyncio.TimeoutError:
+                    if not websocket.open:
+                        self.logger.warning('Closing socket - Asyncio timeout')
+                        if path in self.clients:
+                            self.clients.pop(path)
+
+            except Exception as exc:
+                self.logger.critical('Error in handling exception!!!')
+                self.logger.exception('CRITICAL!! Error in handling exception!!!')
+
+
 
     async def send_response(self, websocket, message_data, response):
         if message_data.get('binary'):
-            self.logger.info('Sending binary response')
             binary_data = msgpack.packb(response, use_bin_type=True)
-            await websocket.send(binary_data)
+            self.logger.info(f'Sending binary response, length: {len(binary_data) / 1024.0 / 1024.0} MB')
+            await asyncio.wait_for(websocket.send(binary_data), timeout=max(self.timeout - 5, 5))
         else:
             self.logger.info('Sending text json response')
             start = time.time()
