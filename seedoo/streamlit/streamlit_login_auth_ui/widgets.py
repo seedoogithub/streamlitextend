@@ -1,9 +1,9 @@
 import streamlit as st
 import json
 import os
-from streamlit_lottie import st_lottie
-from streamlit_option_menu import option_menu
-from streamlit_cookies_manager import EncryptedCookieManager
+# from streamlit_lottie import st_lottie
+# from streamlit_option_menu import option_menu
+# from streamlit_cookies_manager import EncryptedCookieManager
 from .utils import check_usr_pass
 from .utils import load_lottieurl
 from .utils import check_valid_name
@@ -46,9 +46,9 @@ class __login__:
         self.hide_footer_bool = hide_footer_bool
         self.lottie_url = lottie_url
 
-        self.cookies = EncryptedCookieManager(
-        prefix="streamlit_login_ui_yummy_cookies",
-        password='9d68d6f2-4258-45c9-96eb-2d6bc74ddbb5-d8f49cab-edbb-404a-94d0-b25b1d4a564b')
+        # self.cookies = EncryptedCookieManager(
+        # prefix="streamlit_login_ui_yummy_cookies",
+        # password='9d68d6f2-4258-45c9-96eb-2d6bc74ddbb5-d8f49cab-edbb-404a-94d0-b25b1d4a564b')
 
         if not self.cookies.ready():
             st.stop()   
@@ -124,7 +124,7 @@ class __login__:
         Renders the lottie animation.
         """
         lottie_json = load_lottieurl(self.lottie_url)
-        st_lottie(lottie_json, width = self.width, height = self.height)
+        # st_lottie(lottie_json, width = self.width, height = self.height)
 
 
     def sign_up_widget(self) -> None:
@@ -251,16 +251,16 @@ class __login__:
         Creates the side navigaton bar
         """
         main_page_sidebar = st.sidebar.empty()
-        with main_page_sidebar:
-            selected_option = option_menu(
-                menu_title = 'Navigation',
-                menu_icon = 'list-columns-reverse',
-                icons = ['box-arrow-in-right', 'person-plus', 'x-circle','arrow-counterclockwise'],
-                options = ['Login', 'Create Account', 'Forgot Password?', 'Reset Password'],
-                styles = {
-                    "container": {"padding": "5px"},
-                    "nav-link": {"font-size": "14px", "text-align": "left", "margin":"0px"}} )
-        return main_page_sidebar, selected_option
+        # with main_page_sidebar:
+            # selected_option = option_menu(
+            #     menu_title = 'Navigation',
+            #     menu_icon = 'list-columns-reverse',
+            #     icons = ['box-arrow-in-right', 'person-plus', 'x-circle','arrow-counterclockwise'],
+            #     options = ['Login', 'Create Account', 'Forgot Password?', 'Reset Password'],
+            #     styles = {
+            #         "container": {"padding": "5px"},
+            #         "nav-link": {"font-size": "14px", "text-align": "left", "margin":"0px"}} )
+        return main_page_sidebar, {}
     
 
     def hide_menu(self) -> None:

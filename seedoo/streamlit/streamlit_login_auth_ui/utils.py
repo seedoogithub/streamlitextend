@@ -1,13 +1,13 @@
 import re
 import json
-from trycourier import Courier
+# from trycourier import Courier
 import secrets
-from argon2 import PasswordHasher
-import requests
+# from argon2 import PasswordHasher
+# import requests
 
 
-ph = PasswordHasher() 
-
+# ph = PasswordHasher()
+ph = {}
 def check_usr_pass(username: str, password: str) -> bool:
     """
     Authenticates the username and password.
@@ -31,10 +31,11 @@ def load_lottieurl(url: str) -> str:
     Fetches the lottie animation using the URL.
     """
     try:
-        r = requests.get(url)
-        if r.status_code != 200:
-            return None
-        return r.json()
+        # r = requests.get(url)
+        # if r.status_code != 200:
+        #     return None
+        # return r.json()
+        return {}
     except:
         pass
 
@@ -170,22 +171,22 @@ def send_passwd_in_email(auth_token: str, username_forgot_passwd: str, email_for
     """
     Triggers an email to the user containing the randomly generated password.
     """
-    client = Courier(auth_token = auth_token)
-
-    resp = client.send_message(
-    message={
-        "to": {
-        "email": email_forgot_passwd
-        },
-        "content": {
-        "title": company_name + ": Login Password!",
-        "body": "Hi! " + username_forgot_passwd + "," + "\n" + "\n" + "Your temporary login password is: " + random_password  + "\n" + "\n" + "{{info}}"
-        },
-        "data":{
-        "info": "Please reset your password at the earliest for security reasons."
-        }
-    }
-    )
+    # client = Courier(auth_token = auth_token)
+    #
+    # resp = client.send_message(
+    # message={
+    #     "to": {
+    #     "email": email_forgot_passwd
+    #     },
+    #     "content": {
+    #     "title": company_name + ": Login Password!",
+    #     "body": "Hi! " + username_forgot_passwd + "," + "\n" + "\n" + "Your temporary login password is: " + random_password  + "\n" + "\n" + "{{info}}"
+    #     },
+    #     "data":{
+    #     "info": "Please reset your password at the earliest for security reasons."
+    #     }
+    # }
+    # )
 
 
 def change_passwd(email_: str, random_password: str) -> None:

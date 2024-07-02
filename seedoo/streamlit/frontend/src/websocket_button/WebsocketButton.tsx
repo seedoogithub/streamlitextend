@@ -37,6 +37,7 @@ class WebsocketButton extends StreamlitComponentBase<State> {
     this.setState(newState);
 
     if (this.wsWrapper != null) {
+        console.log(newState , 'newState')
       this.wsWrapper.sendData(newState);
     }
     this.setState({ ...this.state ,spinner:false});

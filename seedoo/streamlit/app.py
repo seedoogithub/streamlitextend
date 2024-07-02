@@ -31,9 +31,9 @@ from streamlit_login_auth_ui.widgets import __login__
 
 with st.sidebar:
     auth_data = Msal.initialize_ui(
-        client_id='b97174ee-38fc-46e6-ac06-c013ee14a825',
+        client_id='02dba183-14e1-4c8f-837a-a0a1a75bf811',
         authority='https://login.microsoftonline.com/4cf3d54a-8a8b-4f92-95e6-51043c511c10',
-        scopes=["User.Read"], # Optional
+        scopes=[], # Optional
         # Customize (Default values):
         connecting_label="Connecting",
         disconnected_label="Disconnected",
@@ -103,7 +103,6 @@ if __name__ == "__main__":
             'id': 'modal_id',
             'showModal': True,
             'event': 'similar',
-            'accessToken': accessToken
         })
 
 
@@ -122,7 +121,6 @@ if __name__ == "__main__":
                 'showModal': True,
                 'event': 'similar',
                 'value_one': value_one,
-                'accessToken': accessToken
             })
 
         return st.text_input('text', key='input' + value,label_visibility="collapsed", on_change=change_input_one)

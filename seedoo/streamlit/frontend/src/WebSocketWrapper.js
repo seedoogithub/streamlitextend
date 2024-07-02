@@ -90,25 +90,23 @@ class WebSocketWrapper {
 
 
   sendData(data) {
+    const new_data = {...data}
     if(this.spinner){
        this.showSpinner()
+    }
+    try {
+       const accessToken = JSON.parse(localStorage.getItem('b97174ee-38fc-46e6-ac06-c013ee14a825'))['accessToken']
+       console.log(accessToken , 'accessToken')
+       new_data['accessToken'] = accessToken
+    }catch (e){
+      console.log('not login')
     }
 
     const sendWhenReady = () => {
       if (this.ws.readyState === WebSocket.OPEN) {
-        try {
-          const accessToken = JSON.parse(localStorage.getItem('b97174ee-38fc-46e6-ac06-c013ee14a825'))['accessToken']
-          data['accessToken'] = accessToken
-          const jsonString = JSON.stringify(data);
+          const jsonString = JSON.stringify(new_data);
           this.ws.send(jsonString);
           console.log("Data sent to server with token:", jsonString);
-        }catch (e) {
-          const jsonString = JSON.stringify(data);
-          this.ws.send(jsonString);
-          console.log("Data sent to server:", jsonString);
-        }
-
-
         // start = Date.now()
 
       } else if (this.ws.readyState === WebSocket.CONNECTING) {
