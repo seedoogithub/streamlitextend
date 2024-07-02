@@ -34,7 +34,6 @@ class TrackingThreadPoolExecutor(ThreadPoolExecutor):
         super().__init__(max_workers=max_workers, thread_name_prefix=thread_name_prefix)
         self._lock = Lock()
         self.logger = logging.getLogger(__name__)
-        self._active_threads = 0
         self._futures = []
         self._timeout = timeout
         self._monitor_thread = Thread(target=self._monitor)
@@ -57,6 +56,8 @@ class TrackingThreadPoolExecutor(ThreadPoolExecutor):
             wrapped.thread_id = threading.get_ident()
             wrapped._start_time = time.time()
             try:
+                delay = (time.time() - wrapped._start_time) * 1000
+                (self.logger.info if delay < 5 else self.logger.warning)(f"Submit delay: {delay}")
                 result = fn(*args, **kwargs)
                 return result
             except Exception as e:
@@ -68,9 +69,8 @@ class TrackingThreadPoolExecutor(ThreadPoolExecutor):
     def _monitor(self):
         while True:
             self.logger.debug('Checking tasks for timeout...')
-            self.logger.debug(f'{self._thread_name_prefix} executor, active threads: {self.active_threads}')
             ratio = self.active_threads / self._max_workers
-
+            (self.logger.debug if self.active_threads < 2 else self.logger.info)(f'{self._thread_name_prefix} executor, active threads: {self.active_threads}')
 
             (self.logger.warning if ratio > 0.5 else self.logger.debug)(f'{self._thread_name_prefix} executor utilization: {ratio:.2%}')
 
@@ -91,12 +91,12 @@ class TrackingThreadPoolExecutor(ThreadPoolExecutor):
 
                 # Clean up completed futures
                 self._futures = [(f, wrapped_fn) for f, wrapped_fn in self._futures if not f.done()]
-            time.sleep(1)
+            time.sleep(5)
 
     @property
     def active_threads(self):
         with self._lock:
-            return self._active_threads
+            return len(self._futures)
 
     @property
     def idling_threads(self):
