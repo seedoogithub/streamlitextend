@@ -137,7 +137,7 @@ class WebSocketWrapper {
       this.ws.send(jsonString);
       console.log("Data sent to server:", jsonString);
     } else if (this.ws.readyState === WebSocket.CONNECTING) {
-      console.warn("WebSocket connection is opening, queuing message", this.comopnent_id), Date.now();
+      console.warn("WebSocket connection is opening, queuing message", this.comopnent_id, Date.now());
       this.pendingMessages.push(jsonString); // Queue the message
     } else {
       console.error("WebSocket connection is closed, reconnecting and queuing message");
