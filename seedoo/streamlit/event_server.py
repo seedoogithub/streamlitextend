@@ -7,15 +7,14 @@ import threading
 import msgpack
 import json
 from seedoo.streamlit.tracking_executor import TrackingThreadPoolExecutor, safe_name
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import time
 import os
-import functools
-import weakref
-from streamlit.runtime.scriptrunner import add_script_run_ctx
+import traceback
+import sys
+
 
 SEEDOO_SEMAPHORE_NAME = 'seedoo_ux_semaphore'
-
+error_auth_text = 'user not authenticated'
 
 class WebSocketServer:
     _instance = None
@@ -112,6 +111,7 @@ class WebSocketServer:
 
     async def execute_target_function(self, websocket, target_function, message, path):
         target_function_name = safe_name(target_function)
+        id = 'default_this_means_did not load from message'
         try:
             self.logger.info(f'Executing function: {target_function_name}')
             start = time.time()
@@ -120,16 +120,55 @@ class WebSocketServer:
             (self.logger.warning if duration > 50 else self.logger.debug)(f'message data json load: {duration} ms')
 
             start = time.time()
-            response = await asyncio.get_running_loop().run_in_executor(self.thread_pool_executor, target_function, message_data)
+            try:
+                response = await asyncio.get_running_loop().run_in_executor(self.thread_pool_executor, target_function, message_data)
+                await asyncio.wait_for(self.send_response(websocket, message_data, response), timeout=self.timeout)
+            except asyncio.TimeoutError:
+                self.logger.critical(f'Timeout in sending respone back to client!, path: {path}')
+                if not websocket.open:
+                    self.logger.warning('Closing socket - Asyncio timeout')
+                    if path in self.clients:
+                        self.clients.pop(path)
+
+
+
             duration = (time.time() - start) * 1000
             (self.logger.warning if duration > 500 else self.logger.debug)(f'function {target_function_name} executed for {duration} ms')
 
-            await self.send_response(websocket, message_data, response)
+        except Exception as e:
+            try:
+                self.logger.exception(
+                    f'Error in calling target function: {target_function_name} on path {path}, message was: {message}')
+                # Extracting stack trace
+                exc_type, exc_value, exc_traceback = sys.exc_info()
 
-        except Exception as exc:
-            self.logger.exception(f'Error in calling target function: {target_function_name} on path {path}, message was: {message}')
+                # Extracting stack trace
+                tb = traceback.extract_tb(exc_traceback)
+                # Finding the first stack frame that belongs to this module
+
+                # Get the last frame in the traceback
+                deepest_frame = tb[-1]
+                function_name = deepest_frame.name
+                line_number = deepest_frame.lineno
+
+                message = f"{exc_value} (FN: {function_name}, LN:{line_number})"
+
+                error_message_data = {'id': id, 'event': 'message', 'data': {'message': message, 'type': 'error'}}
+                try:
+                    await asyncio.wait_for(self.send_response(websocket, {}, error_message_data), timeout=10)
+                except asyncio.TimeoutError:
+                    if not websocket.open:
+                        self.logger.warning('Closing socket - Asyncio timeout')
+                        if path in self.clients:
+                            self.clients.pop(path)
+
+            except Exception as exc:
+                self.logger.critical('Error in handling exception!!!')
+                self.logger.exception('CRITICAL!! Error in handling exception!!!')
 
     async def send_response(self, websocket, message_data, response):
+        def error():
+            websocket.send(json.dumps({'event': 'message', 'data': {'message': error_auth_text, 'type': 'error'}}))
         if self.tokens_store:
             if 'accessToken' in message_data:
                 accessToken = message_data['accessToken']
@@ -148,11 +187,24 @@ class WebSocketServer:
 
                         await websocket.send(text_response)
                 else:
-                    websocket.send(json.dumps({'error': 'not login'}))
+                    error()
             else:
-                websocket.send(json.dumps({'error': 'not login'}))
+                error()
         else:
-            websocket.send(json.dumps({'error': 'not login'}))
+            if message_data.get('binary'):
+                self.logger.info('Sending binary response')
+                binary_data = msgpack.packb(response, use_bin_type=True)
+                await websocket.send(binary_data)
+            else:
+                self.logger.info('Sending text json response')
+                start = time.time()
+                text_response = await asyncio.get_running_loop().run_in_executor(self.thread_pool_executor, json.dumps,
+                                                                                 response)
+                json_delay = (time.time() - start) * 1000
+                (self.logger.debug if json_delay < 20 else self.logger.warning)(
+                    f'_send_data_async json dumps took delay is {json_delay} ms')
+
+                await websocket.send(text_response)
 
     async def handle_other_paths(self, websocket, path):
         timeouts = 0
@@ -174,24 +226,33 @@ class WebSocketServer:
 
                     websocket.is_component_ready = True
                     self.logger.info(f'Got callback with key: {key}')
+
+                    def send_login_error(id):
+                        self.send_data({'id': id, 'event': 'message', 'data': {'message': error_auth_text, 'type': 'error'}})
                     if key in self.callbacks:
-                    #     if key in self.callbacks:
-                    #         if self.tokens_store:
-                    #             if 'accessToken' in message:
-                    #                 accessToken = message['accessToken']
-                    #                 if self.tokens_store.check_valid(accessToken):
-                    #                     self.thread_pool_executor.submit(self.callbacks[key], message)
-                    #                 else:
-                    #                     self.send_data({'id': key, 'error': 'not login'}),
-                    #
-                    #             else:
-                    #                 self.send_data({'id': key, 'error': 'not login'})
-                    #         else:
-                    #             self.send_data({'id': key, 'error': 'not login'})
-                        callback, submit_time = self.callbacks[key]
-                        delay = (time.time() - submit_time) * 1000
-                        (self.logger.info if delay < 20 else self.logger.warning)(f'Calling key: {key}, for {callback}, delay: {delay}')
-                        await asyncio.get_running_loop().run_in_executor(self.thread_pool_executor, callback, message)
+                        if key in self.callbacks:
+                            if self.tokens_store:
+                                if 'accessToken' in message:
+                                    accessToken = message['accessToken']
+                                    if self.tokens_store.check_valid(accessToken):
+                                        callback, submit_time = self.callbacks[key]
+                                        delay = (time.time() - submit_time) * 1000
+                                        (self.logger.info if delay < 20 else self.logger.warning)(
+                                            f'Calling key: {key}, for {callback}, delay: {delay}')
+                                        await asyncio.get_running_loop().run_in_executor(self.thread_pool_executor,
+                                                                                         callback, message)
+                                    else:
+                                        send_login_error(key)
+                                else:
+                                    send_login_error(key)
+                            else:
+                                callback, submit_time = self.callbacks[key]
+                                delay = (time.time() - submit_time) * 1000
+                                (self.logger.info if delay < 20 else self.logger.warning)(
+                                    f'Calling key: {key}, for {callback}, delay: {delay}')
+                                await asyncio.get_running_loop().run_in_executor(self.thread_pool_executor,
+                                                                                 callback, message)
+
 
                 except (websockets.exceptions.ConnectionClosedOK, websockets.exceptions.ConnectionClosedError):
                     self.logger.warning('Error in communicating with socket')

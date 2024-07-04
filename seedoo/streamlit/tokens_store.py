@@ -1,12 +1,11 @@
 import streamlit as st
 from datetime import datetime, timedelta
-# from seedoo.collections.capped_caches import LRUCache
+from seedoo.collections.capped_cahes import LRUCache
 
 
 class OurTokensStore:
     def __init__(self):
-        # self.data = LRUCache(capacity = 1000, max_age = 600) # max age is in seconds
-        self.data = {} # max age is in seconds
+        self.data = LRUCache(capacity = 1000, max_age = 172800) # max age is in seconds
 
     def add(self, token):
         if token not in self.data:
