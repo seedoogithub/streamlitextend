@@ -28,32 +28,38 @@ class WebSocketServer:
             if forwarded_port:
                 port = int(forwarded_port)
 
-            WebSocketServer._instance = WebSocketServer(host, port=port)
+            WebSocketServer._instance = WebSocketServer(host, port=port, ctx = st)
             WebSocketServer._instance.start_server()
 
         return WebSocketServer._instance
 
-    def __init__(self, host="localhost", port=9897):
+    def __init__(self, host="localhost", port=9897, ctx = None):
         self.host = host
         self.logger = logging.getLogger(__name__)
         self.port = port
         self.callbacks = {}
-        self.timeout = 40
+        self.timeout = 80
         self.paths = {}
         self.is_running = False
         self.initialized_contexts = False
         self.tokens_store = None
         self.running_server = None
         num_cpus = multiprocessing.cpu_count()
-        self.thread_pool_executor = TrackingThreadPoolExecutor(max_workers=80, timeout = 80)
+        self.thread_pool_executor = TrackingThreadPoolExecutor(max_workers=80, timeout = 180)
 
         def empty():
             return
 
-        for _ in range(40):
+        for _ in range(80):
             self.thread_pool_executor.submit(empty)
 
         self.clients = {} # Keep track of connected clients
+
+
+        if ctx is not None:
+            for thread in threading.enumerate():
+                if thread.name.startswith(self.thread_pool_executor._thread_name_prefix):
+                    add_script_run_ctx(thread, ctx)
 
 
     async def handler(self, websocket, path):
@@ -102,7 +108,7 @@ class WebSocketServer:
                 self.logger.warning(f'Error in communicating with socket for function: {target_function_name}')
                 break
             except asyncio.TimeoutError:
-                self.logger.warning('Asyncio timeout')
+                self.logger.debug('Asyncio timeout')
                 if not websocket.open:
                     self.logger.warning('Closing socket - Asyncio timeout')
                     break
