@@ -5,3 +5,5 @@ pascal_voc_writer
 websockets
 msgpack
 Wand
+Msal
+streamlit_msal
