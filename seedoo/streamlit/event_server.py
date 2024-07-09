@@ -11,16 +11,28 @@ import time
 import os
 import traceback
 import sys
-
+from functools import partial
+from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ctx
 
 SEEDOO_SEMAPHORE_NAME = 'seedoo_ux_semaphore'
 error_auth_text = 'user not authenticated'
+
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.astype(int).tolist()
+        return super(CustomJSONEncoder, self).default(obj)
+
 
 class WebSocketServer:
     _instance = None
 
     @classmethod
-    def instance(cls):
+    def instance(cls, st):
         if WebSocketServer._instance is None:
             port = int(os.environ.get('SEEDOO_WEBSOCKET_EVENT_PORT', '9898'))
             forwarded_port = os.environ.get('SEEDOO_WEBSOCKET_EVENT_PORT_FORWARDED', '')
@@ -28,32 +40,38 @@ class WebSocketServer:
             if forwarded_port:
                 port = int(forwarded_port)
 
-            WebSocketServer._instance = WebSocketServer(host, port=port)
+            WebSocketServer._instance = WebSocketServer(host, port=port, ctx = st)
             WebSocketServer._instance.start_server()
 
         return WebSocketServer._instance
 
-    def __init__(self, host="localhost", port=9897):
+    def __init__(self, host="localhost", port=9897, ctx = None):
         self.host = host
         self.logger = logging.getLogger(__name__)
         self.port = port
         self.callbacks = {}
-        self.timeout = 40
+        self.timeout = 80
         self.paths = {}
         self.is_running = False
         self.initialized_contexts = False
         self.tokens_store = None
         self.running_server = None
         num_cpus = multiprocessing.cpu_count()
-        self.thread_pool_executor = TrackingThreadPoolExecutor(max_workers=80, timeout = 80)
+        self.thread_pool_executor = TrackingThreadPoolExecutor(max_workers=80, timeout = 180)
 
         def empty():
             return
 
-        for _ in range(40):
+        for _ in range(80):
             self.thread_pool_executor.submit(empty)
 
         self.clients = {} # Keep track of connected clients
+
+
+        if ctx is not None:
+            for thread in threading.enumerate():
+                if thread.name.startswith(self.thread_pool_executor._thread_name_prefix):
+                    add_script_run_ctx(thread, ctx)
 
 
     async def handler(self, websocket, path):
@@ -102,7 +120,7 @@ class WebSocketServer:
                 self.logger.warning(f'Error in communicating with socket for function: {target_function_name}')
                 break
             except asyncio.TimeoutError:
-                self.logger.warning('Asyncio timeout')
+                self.logger.debug('Asyncio timeout')
                 if not websocket.open:
                     self.logger.warning('Closing socket - Asyncio timeout')
                     break
@@ -180,7 +198,8 @@ class WebSocketServer:
                     else:
                         self.logger.info('Sending text json response')
                         start = time.time()
-                        text_response = await asyncio.get_running_loop().run_in_executor(self.thread_pool_executor, json.dumps, response)
+                        dumps = partial(json.dumps, cls = CustomJSONEncoder)
+                        text_response = await asyncio.get_running_loop().run_in_executor(None, dumps, response)
                         json_delay = (time.time() - start) * 1000
                         (self.logger.debug if json_delay < 20 else self.logger.warning)(
                             f'_send_data_async json dumps took delay is {json_delay} ms')
@@ -286,7 +305,7 @@ class WebSocketServer:
 
             (self.logger.debug if call_delay < 2 else self.logger.warning)(f'_send_data_async call delay is {call_delay} ms')
             start = time.time()
-            data_as_json_string = json.dumps(data)
+            data_as_json_string = json.dumps(data, cls = CustomJSONEncoder)
             json_delay = (time.time() - start) * 1000
             (self.logger.debug if json_delay < 2 else self.logger.warning)(f'_send_data_async json dumps took delay is {json_delay} ms')
 
