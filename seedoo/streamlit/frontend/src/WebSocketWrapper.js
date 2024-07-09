@@ -206,6 +206,7 @@ class WebSocketWrapper {
     }
       const new_data = {...data}
     try {
+
        const accessToken = JSON.parse(localStorage.getItem('02dba183-14e1-4c8f-837a-a0a1a75bf811'))['accessToken']
        console.log(accessToken , 'accessToken')
        new_data['accessToken'] = accessToken
