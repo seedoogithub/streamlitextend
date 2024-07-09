@@ -11,16 +11,28 @@ import time
 import os
 import traceback
 import sys
-
+from functools import partial
+from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ctx
 
 SEEDOO_SEMAPHORE_NAME = 'seedoo_ux_semaphore'
 error_auth_text = 'user not authenticated'
+
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.astype(int).tolist()
+        return super(CustomJSONEncoder, self).default(obj)
+
 
 class WebSocketServer:
     _instance = None
 
     @classmethod
-    def instance(cls):
+    def instance(cls, st):
         if WebSocketServer._instance is None:
             port = int(os.environ.get('SEEDOO_WEBSOCKET_EVENT_PORT', '9898'))
             forwarded_port = os.environ.get('SEEDOO_WEBSOCKET_EVENT_PORT_FORWARDED', '')
@@ -186,7 +198,8 @@ class WebSocketServer:
                     else:
                         self.logger.info('Sending text json response')
                         start = time.time()
-                        text_response = await asyncio.get_running_loop().run_in_executor(self.thread_pool_executor, json.dumps, response)
+                        dumps = partial(json.dumps, cls = CustomJSONEncoder)
+                        text_response = await asyncio.get_running_loop().run_in_executor(None, dumps, response)
                         json_delay = (time.time() - start) * 1000
                         (self.logger.debug if json_delay < 20 else self.logger.warning)(
                             f'_send_data_async json dumps took delay is {json_delay} ms')
@@ -292,7 +305,7 @@ class WebSocketServer:
 
             (self.logger.debug if call_delay < 2 else self.logger.warning)(f'_send_data_async call delay is {call_delay} ms')
             start = time.time()
-            data_as_json_string = json.dumps(data)
+            data_as_json_string = json.dumps(data, cls = CustomJSONEncoder)
             json_delay = (time.time() - start) * 1000
             (self.logger.debug if json_delay < 2 else self.logger.warning)(f'_send_data_async json dumps took delay is {json_delay} ms')
 
