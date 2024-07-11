@@ -5,7 +5,7 @@ from seedoo.collections.capped_cahes import LRUCache
 
 class OurTokensStore:
     def __init__(self):
-        self.data = LRUCache(capacity = 1000, max_age = 172800) # max age is in seconds
+        self.data = LRUCache(capacity = 5000, max_age = 86400) # max age is in seconds
 
     def add(self, token):
         if token not in self.data:
