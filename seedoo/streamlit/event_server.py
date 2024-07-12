@@ -50,7 +50,7 @@ class WebSocketServer:
         self.logger = logging.getLogger(__name__)
         self.port = port
         self.callbacks = {}
-        self.timeout = 80
+        self.timeout = 130
         self.paths = {}
         self.is_running = False
         self.initialized_contexts = False
@@ -127,6 +127,9 @@ class WebSocketServer:
             except Exception as exc:
                 self.logger.exception(f'Error in socket handler: {exc}')
 
+    async def error(self,websocket,error_auth_text):
+        self.logger.warning(f'{error_auth_text}')
+        await asyncio.wait_for(websocket.send(json.dumps({'event': 'message', 'data': {'message': error_auth_text, 'type': 'error'}})),timeout=self.timeout)
     async def execute_target_function(self, websocket, target_function, message, path):
         target_function_name = safe_name(target_function)
         id = 'default_this_means_did not load from message'
@@ -138,9 +141,24 @@ class WebSocketServer:
             (self.logger.warning if duration > 50 else self.logger.debug)(f'message data json load: {duration} ms')
 
             start = time.time()
+
             try:
-                response = await asyncio.get_running_loop().run_in_executor(self.thread_pool_executor, target_function, message_data)
-                await asyncio.wait_for(self.send_response(websocket, message_data, response), timeout=self.timeout)
+                async def start_function():
+                    response = await asyncio.get_running_loop().run_in_executor(self.thread_pool_executor,
+                                                                                target_function, message_data)
+                    await asyncio.wait_for(self.send_response(websocket, message_data, response),
+                                           timeout=self.timeout)
+                if self.tokens_store:
+                    if 'accessToken' in message_data:
+                        accessToken = message_data['accessToken']
+                        if self.tokens_store.check_valid(accessToken):
+                            await start_function()
+                        else:
+                            await self.error(websocket, error_auth_text)
+                    else:
+                        await self.error(websocket, 'no accessToken')
+                else:
+                    await start_function()
             except asyncio.TimeoutError:
                 self.logger.critical(f'Timeout in sending respone back to client!, path: {path}')
                 if not websocket.open:
@@ -185,45 +203,23 @@ class WebSocketServer:
                 self.logger.exception('CRITICAL!! Error in handling exception!!!')
 
     async def send_response(self, websocket, message_data, response):
-        def error():
-            websocket.send(json.dumps({'event': 'message', 'data': {'message': error_auth_text, 'type': 'error'}}))
-        if self.tokens_store:
-            if 'accessToken' in message_data:
-                accessToken = message_data['accessToken']
-                if self.tokens_store.check_valid(accessToken):
-                    if message_data.get('binary'):
-                        self.logger.info('Sending binary response')
-                        binary_data = msgpack.packb(response, use_bin_type=True)
-                        await websocket.send(binary_data)
-                    else:
-                        self.logger.info('Sending text json response')
-                        start = time.time()
-                        dumps = partial(json.dumps, cls = CustomJSONEncoder)
-                        text_response = await asyncio.get_running_loop().run_in_executor(None, dumps, response)
-                        json_delay = (time.time() - start) * 1000
-                        (self.logger.debug if json_delay < 20 else self.logger.warning)(
-                            f'_send_data_async json dumps took delay is {json_delay} ms')
-
-                        await websocket.send(text_response)
-                else:
-                    error()
-            else:
-                error()
+        if message_data.get('binary'):
+            self.logger.info('Sending binary response')
+            binary_data = msgpack.packb(response, use_bin_type=True)
+            await websocket.send(binary_data)
         else:
-            if message_data.get('binary'):
-                self.logger.info('Sending binary response')
-                binary_data = msgpack.packb(response, use_bin_type=True)
-                await websocket.send(binary_data)
-            else:
-                self.logger.info('Sending text json response')
-                start = time.time()
-                text_response = await asyncio.get_running_loop().run_in_executor(self.thread_pool_executor, json.dumps,
-                                                                                 response)
-                json_delay = (time.time() - start) * 1000
-                (self.logger.debug if json_delay < 20 else self.logger.warning)(
-                    f'_send_data_async json dumps took delay is {json_delay} ms')
+            self.logger.info('Sending text json response')
+            start = time.time()
+            text_response = await asyncio.get_running_loop().run_in_executor(self.thread_pool_executor, json.dumps,
+                                                                             response)
+            json_delay = (time.time() - start) * 1000
+            (self.logger.debug if json_delay < 20 else self.logger.warning)(
+                f'_send_data_async json dumps took delay is {json_delay} ms')
 
-                await websocket.send(text_response)
+            await websocket.send(text_response)
+
+
+
 
     async def handle_other_paths(self, websocket, path):
         timeouts = 0
