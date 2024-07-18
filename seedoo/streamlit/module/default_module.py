@@ -25,6 +25,10 @@ def process_int(value: list, row: Any = None) -> list:
 def process_float(value: float, row: Any = None) -> list:
     return f"{value:.2f}"
 
+@type_matcher(type(None), st.write)
+def process_none(value: float, row: Any = None) -> list:
+    return f"''"
+
 @column_name_matcher('list_column', st.write)
 def create_image(value: Any, row: Any = None) -> Image.Image:
 
