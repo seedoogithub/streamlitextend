@@ -8,7 +8,8 @@ from seedoo.streamlit.widgets import websocket_button, modal
 from functools import partial
 from streamlit_msal import Msal
 from tokens_store import OurTokensStore
-
+import uuid
+import streamlit.components.v1 as components
 
 
 with st.sidebar:
@@ -48,12 +49,20 @@ def initialize_tokens_store():
 def fetch_event_server():
     if 'pool' not in st.session_state:
         st.session_state['pool'] = ThreadPoolExecutor(12)
-    return seedoo.streamlit.event_server.WebSocketServer.instance(), st.session_state['pool']
+    return seedoo.streamlit.event_server.WebSocketServer.instance(None), st.session_state['pool']
 
 
 if __name__ == "__main__":
     import seedoo.streamlit.module.default_module
 
+    if 'session_id' not in st.session_state:
+        st.session_state['session_id'] = str(uuid.uuid4())
+        components.html(f"""
+                <script>
+                    // Save session ID to local storage
+                    localStorage.setItem('session_id', '{st.session_state['session_id']}');
+                </script>
+            """, height=0)
     event_server, asynch_pool = fetch_event_server()
     tokens_store = initialize_tokens_store()
     # Initialize contexts for the event server
@@ -68,6 +77,7 @@ if __name__ == "__main__":
 
         event_server.initialized_contexts = True
     tokens_store.add(accessToken)
+    tokens_store.set_session_state(st.session_state['session_id'])
     if not event_server.tokens_store:
         event_server.tokens_store = tokens_store
 
@@ -77,10 +87,14 @@ if __name__ == "__main__":
 
     # Display a modal component
     modal('modal_id', 'modal_id_test')
-
-
+    def change_input_session():
+        value_one = st.session_state['input_session']
+        tokens_store.set_session_data( 'input',value_one)
+    st.text_input('text', key='input_session', on_change=change_input_session)
+    st.write(tokens_store.get_session_data('input'))
     # Callback function for when the "View Clusters" button is clicked
     def view_clusters_clicked_labeling(msg):
+        print(msg)
         event_server.running_server.send_data({
             'id': 'modal_id',
             'showModal': True,
