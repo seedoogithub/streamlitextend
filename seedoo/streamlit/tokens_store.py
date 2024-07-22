@@ -22,8 +22,7 @@ class OurTokensStore:
         if session_id not in self.session_state:
             self.session_state[session_id] = {}
 
-    def set_session_data(self, key, value):
-        session_id = st.session_state['session_id']
+    def set_session_data(self, session_id, key, value):
         session_state = self.get_session_state(session_id)
         if session_state is None:
             session_state = {}
@@ -31,8 +30,7 @@ class OurTokensStore:
         session_state[key] = value
         self.session_state[session_id] = session_state
 
-    def get_session_data(self, key):
-        session_id = st.session_state['session_id']
+    def get_session_data(self, session_id, key):
         session_state = self.get_session_state(session_id)
         if session_state is not None:
             return session_state.get(key)

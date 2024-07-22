@@ -89,9 +89,9 @@ if __name__ == "__main__":
     modal('modal_id', 'modal_id_test')
     def change_input_session():
         value_one = st.session_state['input_session']
-        tokens_store.set_session_data( 'input',value_one)
+        tokens_store.set_session_data( st.session_state['session_id'],'input',value_one)
     st.text_input('text', key='input_session', on_change=change_input_session)
-    st.write(tokens_store.get_session_data('input'))
+    st.write(tokens_store.get_session_data(st.session_state['session_id'],'input'))
     # Callback function for when the "View Clusters" button is clicked
     def view_clusters_clicked_labeling(msg):
         print(msg)
