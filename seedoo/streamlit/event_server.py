@@ -137,7 +137,7 @@ class WebSocketServer:
             self.logger.info(f'Executing function: {target_function_name}')
             start = time.time()
             message_data = json.loads(message)
-            if message_data['session_id']:
+            if 'session_id' in message_data:
                 message_data['session_state'] = self.tokens_store.get_session_state(message_data['session_id'])
             duration = (time.time() - start) * 1000
             (self.logger.warning if duration > 50 else self.logger.debug)(f'message data json load: {duration} ms')
@@ -236,7 +236,7 @@ class WebSocketServer:
                     start_json = time.time()
                     message = await asyncio.get_running_loop().run_in_executor(self.thread_pool_executor, json.loads, message)
                     json_delay = (time.time() - start_json) * 1000
-                    if message['session_id']:
+                    if 'session_id' in message:
                         message['session_state'] = self.tokens_store.get_session_state(message['session_id'])
                     key = message['id']
                     (self.logger.info if delay < 20 else self.logger.warning)(
