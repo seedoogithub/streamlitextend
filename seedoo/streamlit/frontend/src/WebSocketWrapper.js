@@ -108,6 +108,8 @@ class WebSocketWrapper {
     if (window.location.protocol !== "https:") {
       wsType = 'ws';
     }
+    const sessionId = localStorage.getItem('session_id')
+    console.log(sessionId , 'sessionId')
     this.ws = new WebSocket(`${wsType}://${this.ip}:${this.port}/ws/${this.component_id}`);
     this.ws.binaryType = 'arraybuffer';
 
@@ -208,12 +210,14 @@ class WebSocketWrapper {
     try {
 
        const accessToken = JSON.parse(localStorage.getItem('02dba183-14e1-4c8f-837a-a0a1a75bf811'))['accessToken']
+       const session_id = localStorage.getItem('session_id')
        console.log(accessToken , 'accessToken')
        new_data['accessToken'] = accessToken
+       new_data['session_id'] = session_id
     }catch (e){
       console.log('not login')
     }
-    const jsonString = JSON.stringify(data);
+    const jsonString = JSON.stringify(new_data);
 
     if (this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(jsonString);
