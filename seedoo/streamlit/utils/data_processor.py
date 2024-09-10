@@ -105,7 +105,7 @@ def process_dataframe(
         filter: bool = None,
         filter_callback: Optional[Callable[[str, int, int, pd.DataFrame], pd.DataFrame]] = default_filter_callback,
         key: str = "process_dataframe_key",
-        page_size_num: int = 5, strict = False) -> None:
+        page_size_num: int = 5, strict = False, disabled: bool = False) -> None:
     global custom_functions
     """
     Processes each value in the DataFrame, passing it to a function based on the column's data type.
@@ -187,7 +187,7 @@ def process_dataframe(
                             if column in custom_functions:
                                 func = custom_functions[column]['function']
                                 component = custom_functions[column]['component']
-                                output = func(value, row)
+                                output = func(value, row, disabled)
                                 if component:
                                     component(output)
                                 elif strict:
@@ -196,7 +196,7 @@ def process_dataframe(
                             elif column_type in custom_functions:
                                 func = custom_functions[column_type]['function']
                                 component = custom_functions[column_type]['component']
-                                output = func(value, row)
+                                output = func(value, row, disabled)
                                 if component:
                                     component(output)
                                 elif strict:
