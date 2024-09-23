@@ -250,12 +250,15 @@ class WebSocketServer:
                     message = await asyncio.get_running_loop().run_in_executor(self.thread_pool_executor, json.loads,
                                                                                message)
                     json_delay = (time.time() - start_json) * 1000
+                    user_key = user_id_default
                     if 'session_id' in message:
                         message['session_state'] = self.tokens_store.get_session_state(message['session_id'])
                     if 'user_id' in message:
                         message['user_state'] = self.tokens_store.get_user_state(message['user_id'])
+                        user_key = message['user_id']
                     key = message['id']
-                    user_key = message['user_id']
+
+
                     if not user_key:
                         user_key = user_id_default
                     (self.logger.info if delay < 20 else self.logger.warning)(
