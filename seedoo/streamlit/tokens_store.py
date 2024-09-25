@@ -39,10 +39,35 @@ class OurTokensStore:
     def __init__(self):
         self.data = LRUCache(capacity=5000, max_age=86400)  # max age is in seconds
         self.session_state = LRUCache(capacity=5000, max_age=86400)  # max age is in seconds
+        self.user_stor = LRUCache(capacity=5000, max_age=86400)  # max age is in seconds
 
     def add(self, token):
         if token not in self.data:
             self.data[token] = datetime.now()
+
+    def get_user_state(self, user_id):
+        if user_id and user_id in self.user_stor:
+            return self.user_stor[user_id]
+        else:
+            return None
+
+    def set_user_state(self, user_id):
+        if user_id not in self.user_stor:
+            self.user_stor[user_id] = {}
+
+    def set_user_data(self, user_id, key, value):
+        local_state = self.get_user_state(user_id)
+        if local_state is None:
+            local_state = {}
+            self.user_stor[user_id] = local_state
+        local_state[key] = value
+        self.user_stor[user_id] = local_state
+
+    def get_user_data(self, user_id, key):
+        user_state = self.get_user_state(user_id)
+        if user_state is not None:
+            return user_state.get(key)
+        return None
 
     def get_session_state(self, session_id):
         if session_id and session_id in self.session_state:
