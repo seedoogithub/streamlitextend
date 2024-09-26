@@ -83,6 +83,8 @@ class TrackingThreadPoolExecutor(ThreadPoolExecutor):
                             self.logger.critical(f'Task {future} is running for {duration} longer than {self._timeout} seconds and will be cancelled.')
                             if wrapped_fn.thread_id:
                                 _async_raise(wrapped_fn.thread_id, ThreadInterrupted)
+                            else:
+                                self.logger.critical(f"Task {future} can not be canceled because it doesn't have a thread id")
 
                         elif duration > self._timeout * 0.98:
                             ratio = duration / self._timeout
