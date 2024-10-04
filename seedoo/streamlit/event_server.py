@@ -114,7 +114,7 @@ class WebSocketServer:
                     self.logger.critical(f'Target requested function: {target_function} is not registered.')
                 else:
                     target_function = self.paths[target_function]
-                    await self.execute_target_function(websocket, target_function, message, path)
+                    asyncio.create_task(self.execute_target_function(websocket, target_function, message, path))
 
             except (websockets.exceptions.ConnectionClosedOK, websockets.exceptions.ConnectionClosedError):
                 self.logger.warning(f'Error in communicating with socket for function: {target_function_name}')
