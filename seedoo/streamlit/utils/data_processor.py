@@ -10,6 +10,7 @@ import numpy as np
 import streamlit as st
 import pandas
 import functools
+import math
 
 # Dictionary to store custom functions
 custom_functions: Dict[type, Dict[str, Union[Callable, Optional[Callable]]]] = {}
@@ -29,7 +30,8 @@ def register_function(column_name: type, func: Callable, component: Optional[Cal
     custom_functions[column_name] = {'function': func, 'component': component}
 
 
-def load_functions_with_decorator(package_root="seedoo.streamlit.module.default_module") -> Dict[type, Dict[str, Union[Callable, Optional[Callable]]]]:
+def load_functions_with_decorator(package_root="seedoo.streamlit.module.default_module") -> Dict[
+    type, Dict[str, Union[Callable, Optional[Callable]]]]:
     global custom_functions
     """
     Scans all modules in the specified package for functions with the @type_matcher decorator.
@@ -47,8 +49,6 @@ def load_functions_with_decorator(package_root="seedoo.streamlit.module.default_
     except ModuleNotFoundError:
         raise ValueError(f"The package '{package_root}' is invalid.")
 
-
-
     if file_path:
         for root, _, files in os.walk(file_path):
             for filename in files:
@@ -59,8 +59,11 @@ def load_functions_with_decorator(package_root="seedoo.streamlit.module.default_
                             key = func._column_type if hasattr(func, '_column_type') else func._column_name
                             custom_functions[key] = {'function': func, 'component': func._component}
 
+
 load_functions_with_decorator()
 print('load-----------')
+
+
 def pick_page(current_page: Optional[int] = None, key: str = '') -> None:
     """
     Sets the current page in Streamlit session state.
@@ -70,6 +73,14 @@ def pick_page(current_page: Optional[int] = None, key: str = '') -> None:
         key (str): The session state key for the current page.
     """
     st.session_state[key] = current_page
+
+
+def calculate_total_pages(df: pd.DataFrame, page_size: int) -> int:
+    total_rows = len(df)
+    if page_size == 0 or 0 == len(df):
+        return 10
+    total_pages = math.ceil(total_rows / page_size)
+    return total_pages
 
 
 def default_filter_callback(query: str, page_size: int, current_page: int, df: pd.DataFrame) -> pd.DataFrame:
@@ -87,17 +98,110 @@ def default_filter_callback(query: str, page_size: int, current_page: int, df: p
     """
     start_idx = current_page * page_size
     end_idx = start_idx + page_size
+    total = calculate_total_pages(df, page_size)
     if query:
         filtered_df = df.query(query)
-        return filtered_df.iloc[start_idx:end_idx]
+        return [filtered_df.iloc[start_idx:end_idx], total]
     else:
-        return df.iloc[start_idx:end_idx]
+        return [df.iloc[start_idx:end_idx], total]
 
 
 def go_to_first_page(key):
     key_current_page = key + 'current_page'
     if key_current_page in st.session_state:
         st.session_state[key_current_page] = 0
+def render_pagination(total_pages=None, has_more_data=True,
+                              key_current_page: str = "current_page"):
+            """
+            Render a dynamic pagination component in Streamlit.
+
+            Args:
+                current_page (int): Currently active page.
+                total_pages (int, optional): Total number of pages. Defaults to None for dynamic pagination.
+                has_more_data (bool): Indicator if there's more data to paginate through. Defaults to True.
+                key_current_page (str): Session state key to track the current page. Defaults to "current_page".
+            """
+
+            # Check if total_pages is provided or not (dynamic mode)
+            dynamic_mode = total_pages is None
+
+            # Initialize current page if not present in session state
+            if key_current_page not in st.session_state:
+                st.session_state[key_current_page] = 0
+
+            # Get the current page from session state
+            current_page = st.session_state[key_current_page]
+
+            # Render dynamic pagination when total_pages is None
+            if dynamic_mode:
+                # Center the buttons and page info
+                col_space1, col_prev, col_info, col_next, col_space2 = st.columns([1, 2, 2, 2, 1])
+
+                with col_info:
+                    first, second, third = st.columns([2,2,2])
+                    with first:
+                        if current_page > 0:
+                            st.button("Previous",use_container_width=True,
+                                      on_click=functools.partial(pick_page, current_page - 1, key_current_page))
+                        else:
+                            st.button("Previous", disabled=True , use_container_width=True)
+                    with second:
+                        st.write(
+                            f"<div style='text-align: center;font-size: 17px;border: 1px solid rgb(237, 111, 19);border-color: rgb(255, 75, 75);color: rgb(255, 75, 75);padding: 0.25rem 0.75rem;border-radius: 0.5rem;min-height: 38.4px;'>{current_page + 1}</div>",
+                            use_container_width=True, unsafe_allow_html=True)
+                    with third:
+                        st.button("Next",use_container_width=True, on_click=functools.partial(pick_page, current_page + 1, key_current_page),
+                                  disabled=not has_more_data)
+            else:
+                # Static mode: use page range logic
+                if total_pages <= 1:
+                    return  # No need for pagination if there's only one page
+
+                # Calculate page range based on the current page position
+                page_range = [0]
+
+                if current_page <= 3:
+                    page_range.extend(range(1, min(total_pages - 1, 6)))
+                elif current_page >= total_pages - 4:
+                    page_range.extend(range(max(1, total_pages - 6), total_pages - 1))
+                else:
+                    page_range.extend(range(current_page - 2, current_page + 3))
+
+                # Ensure first and last pages are included in the range
+                if total_pages > 1:
+                    page_range.append(total_pages - 1)
+
+                # Remove duplicates and sort the range
+                page_range = sorted(set(page_range))
+
+                # Add "..." where needed
+                if len(page_range) > 2 and page_range[1] != 1:
+                    page_range.insert(1, "...")  # Add "..." after the first page
+                if len(page_range) > 2 and page_range[-2] != page_range[-1] - 1:
+                    page_range.insert(-1, "...")  # Add "..." before the last page
+
+                # Center the buttons and page info
+                alignment_cols = len(page_range)
+
+                # Create columns for centering the pagination buttons
+                if alignment_cols < 7:
+                    cols = st.columns(7)
+                    start_index = (7 - alignment_cols) // 2  # Calculate the start index for centering the buttons
+                else:
+                    cols = st.columns(alignment_cols)
+                    start_index = 0  # No offset needed if we have enough columns
+
+                # Render pagination buttons with adjusted centering
+                for index, page_num in enumerate(page_range):
+                    with cols[start_index + index]:  # Adjust index for centering
+                        if page_num == "...":
+                            st.write("<div style='text-align: center; font-size: 24px;'>...</div>",use_container_width=True,unsafe_allow_html=True)  # Static placeholder for "..."
+                        elif page_num == current_page:
+                            st.write(f"<div style='text-align: center;font-size: 17px;border: 1px solid rgb(237, 111, 19);border-color: rgb(255, 75, 75);color: rgb(255, 75, 75);padding: 0.25rem 0.75rem;border-radius: 0.5rem;min-height: 38.4px;'>{page_num + 1}</div>",
+                                     use_container_width=True, unsafe_allow_html=True)
+                        else:
+                            st.button(f"{page_num + 1}",use_container_width=True, key=f"page_{page_num}_clicked",
+                                      on_click=functools.partial(pick_page, page_num, key_current_page))
 
 def process_dataframe(
         df: pd.DataFrame,
@@ -105,7 +209,7 @@ def process_dataframe(
         filter: bool = None,
         filter_callback: Optional[Callable[[str, int, int, pd.DataFrame], pd.DataFrame]] = default_filter_callback,
         key: str = "process_dataframe_key",
-        page_size_num: int = 5, strict = False, disabled: bool = False) -> None:
+        page_size_num: int = 5, strict=False, disabled: bool = False) -> None:
     global custom_functions
     """
     Processes each value in the DataFrame, passing it to a function based on the column's data type.
@@ -123,6 +227,7 @@ def process_dataframe(
     """
     logger = logging.getLogger(__name__)
     key_page_size = key + 'PAGE_SIZE'
+
     key_current_page = key + 'current_page'
     if key_page_size not in st.session_state:
         st.session_state[key_page_size] = page_size_num
@@ -132,16 +237,21 @@ def process_dataframe(
     current_page = st.session_state.get(key_current_page, 0)
 
     if filter:
+
         def change_input_one():
             go_to_first_page(key)
-        query = st.text_input("Enter your query (e.g., id == 54):", key=key + 'query',on_change=change_input_one)
+
+        query = st.text_input("Enter your query (e.g., id == 54):", key=key + 'query', on_change=change_input_one)
         try:
-            df = filter_callback(query, PAGE_SIZE, current_page, df)
+            result = filter_callback(query, PAGE_SIZE, current_page, df)
+            if len(result) == 3:
+                df, total_pages, stop_page = result
+            else:
+                df, total_pages = result
+                stop_page = True
         except Exception as e:
             st.error(f"Query failed: {traceback.format_exc()}")
             raise
-
-
 
     col_names = [c for c in df.columns.values if '_widget' not in c]
     handled_rows = 0
@@ -205,35 +315,8 @@ def process_dataframe(
                                 message = f"No registered function for processing type '{column_type.__name__}' in column '{column}'."
                                 st.write(message)
                                 logger.warning(message)
+
         columns = st.columns(10)
         if filter:
-            current_selected_page = st.session_state.get(key_current_page, 0)
-            for page_number, c in enumerate(columns):
-                button_key = f'page_{page_number}_clicked'
-                with c:
-                    if page_number == current_selected_page:
-                        st.markdown(
-                            """
-                            <style>
-                            .element-container:has(style){
-                                display: none;
-                            }
-                            #button-after {
-                                display: none;
-                            }
-                            .element-container:has(#button-after) {
-                                display: none;
-                            }
-                            .element-container:has(#button-after) + div button {
-                                background-color: orange;
-                                }
-                            </style>
-                            """,
-                            unsafe_allow_html=True,
-                        )
-                        st.button(f'** {page_number + 1}', key=button_key,
-                                  on_click=functools.partial(pick_page, page_number, key_current_page))
-                        st.markdown('<span id="button-after"></span>', unsafe_allow_html=True)
-                    else:
-                        st.button(f'{page_number + 1}', key=button_key,
-                                  on_click=functools.partial(pick_page, page_number, key_current_page))
+            print(len(df))
+            render_pagination(total_pages,stop_page, key_current_page)
