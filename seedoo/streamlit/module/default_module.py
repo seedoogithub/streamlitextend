@@ -13,12 +13,6 @@ def process_list(value: list, row: Any = None, disabled: bool = False) -> list:
     value.append('processed')
     return value
 
-@type_matcher(tuple, st.write)
-def process_list(value: tuple, row: Any = None, disabled: bool = False) -> list:
-    value = list(value)
-    value.append('processed')
-    return value
-
 
 @type_matcher(str, st.write)
 def process_str(value: list, row: Any = None, disabled: bool = False) -> list:
