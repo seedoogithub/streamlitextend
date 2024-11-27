@@ -312,7 +312,7 @@ def process_dataframe(
                                 elif strict:
                                     raise RuntimeError(f"Output for {value} in column {column}: {output}")
                             else:
-                                message = f"No registered function for processing type '{column_type}' in column '{column}'."
+                                message = f"No registered function for processing type '{column_type.__name__}' in column '{column}'."
                                 st.write(message)
                                 logger.warning(message)
 

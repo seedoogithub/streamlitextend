@@ -27,7 +27,7 @@ def process_float(value: float, row: Any = None, disabled: bool = False) -> list
     return f"{value:.2f}"
 
 @type_matcher(bool, st.write)
-def process_float(value: bool, row: Any = None, disabled: bool = False) -> list:
+def process_bool(value: bool, row: Any = None, disabled: bool = False) -> list:
     return f"{value}"
 
 @type_matcher(type(None), st.write)
