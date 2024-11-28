@@ -31,7 +31,7 @@ def process_bool(value: bool, row: Any = None, disabled: bool = False) -> list:
     return f"{value}"
 
 @type_matcher(type(None), st.write)
-def process_none(value: float, row: Any = None) -> list:
+def process_none(value: float, row: Any = None, disabled: bool = False) -> list:
     return f"''"
 
 @column_name_matcher('list_column', st.write)
