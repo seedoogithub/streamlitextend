@@ -12,7 +12,6 @@ import pandas
 import functools
 import math
 
-from setuptools.command.easy_install import only_strs
 
 # Dictionary to store custom functions
 custom_functions: Dict[type, Dict[str, Union[Callable, Optional[Callable]]]] = {}
