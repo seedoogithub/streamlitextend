@@ -12,6 +12,8 @@ import pandas
 import functools
 import math
 
+from setuptools.command.easy_install import only_strs
+
 # Dictionary to store custom functions
 custom_functions: Dict[type, Dict[str, Union[Callable, Optional[Callable]]]] = {}
 
@@ -136,7 +138,17 @@ def render_pagination(total_pages=None, has_more_data=True,
             if dynamic_mode:
                 # Center the buttons and page info
                 col_space1, col_prev, col_info, col_next, col_space2 = st.columns([1, 2, 2, 2, 1])
+                st.markdown(
+                    """
+                    <style>
 
+                        input[type="number"] {
+                            text-align: center;
+                        }
+                    </style>
+                    """,
+                    unsafe_allow_html=True
+                )
                 with col_info:
                     first, second, third = st.columns([2,2,2])
                     with first:
@@ -146,9 +158,19 @@ def render_pagination(total_pages=None, has_more_data=True,
                         else:
                             st.button("Previous", disabled=True , use_container_width=True)
                     with second:
-                        st.write(
-                            f"<div style='text-align: center;font-size: 17px;border: 1px solid rgb(237, 111, 19);border-color: rgb(255, 75, 75);color: rgb(255, 75, 75);padding: 0.25rem 0.75rem;border-radius: 0.5rem;min-height: 38.4px;'>{current_page + 1}</div>",
-                            use_container_width=True, unsafe_allow_html=True)
+
+                        def hundle_input():
+                            value = st.session_state[f'current_page_input'+key_current_page]
+                            pick_page(value -1 , key_current_page)
+                        page_input = st.number_input(
+                            "",
+                            key=f'current_page_input'+key_current_page,
+                            min_value=1,
+                            value=current_page + 1,
+                            on_change=hundle_input,
+                            label_visibility="collapsed"
+                        )
+
                     with third:
                         st.button("Next",use_container_width=True, on_click=functools.partial(pick_page, current_page + 1, key_current_page),
                                   disabled=not has_more_data)
