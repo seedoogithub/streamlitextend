@@ -307,6 +307,10 @@ class WebSocketServer:
                         break
                 except Exception as exc:
                     self.logger.exception(f'Error in socket handler: {exc}')
+                    if callback:
+                        self.send_data({'id': callback.args[1], 'event': 'message',
+                                                               'data': {'message': f'Error in socket handler: {exc}', 'type': 'error',
+                                                                        'open': True}})
         finally:
             if path is not None and path in self.clients:
                 self.logger.info(f'Popping from clients: {path}')
