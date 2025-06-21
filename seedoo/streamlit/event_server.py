@@ -405,7 +405,7 @@ class WebSocketServer:
         num_cpus = multiprocessing.cpu_count()
         
         # Check if priority queue is enabled
-        use_priority_queue = os.environ.get('SEEDOO_ENABLE_PRIORITY_QUEUE', 'false').lower() == 'true'
+        use_priority_queue = os.environ.get('SEEDOO_ENABLE_PRIORITY_QUEUE', 'true').lower() == 'true'
         thread_pool_size = int(os.environ.get('SEEDOO_THREAD_POOL_SIZE', '40'))
         max_age_ms = int(os.environ.get('SEEDOO_PRIORITY_MAX_AGE_MS', '10000'))
         default_timeout = float(os.environ.get('SEEDOO_DEFAULT_CALLBACK_TIMEOUT', '0'))
